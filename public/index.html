@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strak · Tokenized stocks on Solana. Is the volume real</title>
+<meta name="description" content="Every tokenized stock on Solana on one screen: xStocks, Ondo, Backpack. Turnover shows whether the volume behind a price is real.">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#120A24">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Strak">
+<meta property="og:title" content="Strak · Is the volume real">
+<meta property="og:description" content="Everyone shows the price. Strak shows whether it's lying. Turnover for every tokenized stock on Solana.">
+<meta property="og:image" content="https://strak-six.vercel.app/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://strak-six.vercel.app/og.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Ubuntu+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/landing.css">
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="nav-in">
+    <a class="logo" href="/" aria-label="Strak home">
+      <img src="/brand/mark-64.webp" alt="" width="22" height="24">
+      <span>Strak</span>
+    </a>
+    <nav class="links" aria-label="Sections">
+      <a href="#board">Board</a>
+      <a href="#swaps">Live swaps</a>
+      <a href="#turnover">Turnover</a>
+      <a href="#bands">Bands</a>
+      <a href="#issuers">Issuers</a>
+      <a href="#faq">FAQ</a>
+      <a href="/docs">Docs</a>
+    </nav>
+    <a class="btn btn-primary" href="/app">Open terminal</a>
+  </div>
+</header>
+
+<main>
+
+<!-- ── hero: the banner, alive ─────────────────────────────── -->
+<section class="hero" id="hero">
+  <canvas class="flow" id="flow" aria-hidden="true"></canvas>
+  <div class="chips" id="chips" aria-hidden="true"></div>
+
+  <div class="hero-in">
+    <h1 class="lockup" aria-label="Strak">
+      <img src="/brand/mark-160.webp" alt="" width="58" height="64">
+      <span>Strak</span>
+    </h1>
+    <p class="kicker">Tokenized stocks on Solana <i>·</i> Is the volume real</p>
+    <p class="lead">Everyone shows the price. Strak shows whether it's lying: 24h volume against pool depth, for every tokenized stock on Solana.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="/app">Open terminal</a>
+      <a class="btn btn-ghost" href="#turnover">How to read turnover</a>
+    </div>
+    <p class="hero-stats" id="heroStats"><span class="skel">Loading the registry</span></p>
+  </div>
+</section>
+
+<!-- ── the board: a live copy of the terminal in a browser frame ── -->
+<section class="product" id="board">
+  <p class="marq-title" data-r><span id="marqTitle">Every tokenized stock from three issuers</span></p>
+  <div class="marq" aria-hidden="true"><div class="marq-track" id="marq"></div></div>
+
+  <div class="dash-stage">
+    <div class="dash-glow" aria-hidden="true"></div>
+    <div class="dash" id="dash" data-r="dash">
+      <div class="dash-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="url">strak · terminal</span>
+        <span class="live"><b class="live-dot"></b><span id="dashStamp">live</span></span>
+      </div>
+      <div class="dash-body">
+        <aside class="dash-side">
+          <div class="dash-brand"><img src="/brand/mark-64.webp" alt="" width="16" height="18"><b>Strak</b><i>terminal</i></div>
+          <nav id="dashIssuers"></nav>
+          <a class="dash-cta" href="/app"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 1 3 9h4l-1 6 6-8H8z" fill="currentColor"/></svg><span><b>Open the full board</b><i id="dashCount">every stock, live</i></span></a>
+        </aside>
+        <div class="dash-main">
+          <div class="dash-top">
+            <div class="dash-hot">
+              <p class="dash-kick"><span>Hottest turnover right now</span><a href="/app">See all →</a></p>
+              <h3>Is the volume real</h3>
+              <div class="hot-cards" id="hotCards"></div>
+            </div>
+            <a class="dash-promo" id="dashPromo" href="/docs#case-files">
+              <span class="promo-top"><span class="promo-brand"><img src="/brand/mark-64.webp" alt="" width="12" height="13">Strak</span><em>Case file</em></span>
+              <b>IONQ printed <span id="promoX">152.4x</span></b>
+              <span class="promo-sub" id="promoSub">A dated snapshot from the registry</span>
+              <span class="promo-btn">Read the case</span>
+              <span class="promo-btn ghost">Read the method</span>
+            </a>
+          </div>
+          <div class="dash-table">
+            <div class="dash-tabs" id="dashTabs">
+              <button data-sort="turnover" class="on">Highest turnover</button>
+              <button data-sort="vol24">Most volume</button>
+              <button data-sort="liq">Deepest pools</button>
+              <button data-sort="move">Biggest moves</button>
+              <a href="/app">See all →</a>
+            </div>
+            <div class="dt-head"><span>#</span><span>Stock</span><span class="hide-m">Name</span><span class="r">Price</span><span class="r hide-s">Volume</span><span class="r hide-m">Liquidity</span><span class="r">Turnover</span><span class="hide-s">24h</span><span></span></div>
+            <div id="dashRows"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── who makes the volume: live swaps of the hottest pools ── -->
+<section class="sec" id="swaps">
+  <div class="col">
+    <div class="sec-head center">
+      <h2 class="split">Watch who makes the volume</h2>
+      <p class="sub" data-r>Turnover says the volume doesn't fit the pool. The swaps say who is making it. The last 300 trades of the hottest pools, live.</p>
+    </div>
+    <div class="wv" data-r>
+      <div class="wv-tabs" id="wvTabs"></div>
+      <div class="wv-grid">
+        <div class="wv-feed">
+          <div class="wv-fh"><span>Time</span><span>Side</span><span>Wallet</span><span class="r">Size</span></div>
+          <div class="wv-rows" id="wvRows"><p class="wv-empty">Reading the pool…</p></div>
+          <div class="wv-foot"><b class="live-dot"></b><span id="wvStamp">live</span></div>
+        </div>
+        <div class="wv-side">
+          <div class="wv-stats">
+            <div><i>Trades a minute</i><b id="wvPace">·</b></div>
+            <div><i>Median trade</i><b id="wvMed">·</b></div>
+            <div><i>Wallets</i><b id="wvWallets">·</b></div>
+            <div><i>Window</i><b id="wvWin">·</b></div>
+          </div>
+          <div class="wv-meter">
+            <p><span>Top 3 wallets carry</span><b id="wvTop3">·</b></p>
+            <div class="bar"><i id="wvTop3Bar"></i></div>
+            <p><span>Bought and sold in the window</span><b id="wvRT">·</b></p>
+            <div class="bar rt"><i id="wvRTBar"></i></div>
+          </div>
+          <div class="wv-top">
+            <p class="wv-k">Biggest wallets in the window</p>
+            <div id="wvTop"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── three 50/50 rows ─────────────────────────────────────── -->
+<section class="sec" id="turnover">
+  <div class="col">
+    <div class="sec-head center">
+      <h2 class="split">One ratio tells you if the volume is real</h2>
+      <p class="sub" data-r>Turnover is 24h volume divided by the liquidity in the pool. Real traders can only push a pool around so many times a day. Past that point, the volume is the same money going in circles.</p>
+    </div>
+
+    <div class="rows5050">
+      <div class="r5050">
+        <div class="r-text" data-r>
+          <div class="tags"><span>Turnover</span><span>Volume ÷ liquidity</span></div>
+          <h3>Volume a pool can't carry is volume that didn't happen</h3>
+          <p>Every price on a DEX is where the last trades left the pool. When those trades turn the pool over dozens of times a day, the price is a loop, not a market. Strak puts that ratio next to every price.</p>
+          <a class="btn btn-gray" href="/app">Open terminal <svg viewBox="0 0 16 16"><path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" /></svg></a>
+        </div>
+        <div class="r-vis vis-gauge" data-r>
+          <svg class="gauge" viewBox="0 0 280 280" aria-hidden="true">
+            <defs>
+              <linearGradient id="gArc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9945FF"/><stop offset="1" stop-color="#14F195"/></linearGradient>
+              <radialGradient id="gDisc" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#1c1535"/><stop offset="1" stop-color="#0b0918"/></radialGradient>
+            </defs>
+            <circle cx="140" cy="140" r="132" fill="#15122a" stroke="rgba(255,255,255,.08)"/>
+            <circle cx="140" cy="140" r="118" fill="url(#gDisc)"/>
+            <g id="gTicks"></g>
+            <circle id="gArcBg" cx="140" cy="140" r="100" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="30"/>
+            <circle id="gArcFill" cx="140" cy="140" r="100" fill="none" stroke="url(#gArc)" stroke-width="30" stroke-dasharray="0 999" transform="rotate(-90 140 140)"/>
+            <g id="gLabels"></g>
+            <circle cx="140" cy="140" r="70" fill="#0d0b1c" stroke="rgba(255,255,255,.06)"/>
+            <text id="gVal" x="140" y="146" text-anchor="middle" class="g-val">·</text>
+            <text id="gSym" x="140" y="170" text-anchor="middle" class="g-sym"></text>
+          </svg>
+          <span class="pill-note" id="gNote">Loading</span>
+        </div>
+      </div>
+
+      <div class="r5050 flip">
+        <div class="r-text" data-r>
+          <div class="tags"><span>Three issuers</span><span id="tagCount">Every stock</span></div>
+          <h3>Every tokenized stock on Solana on one screen</h3>
+          <p>xStocks, Ondo and Backpack Securities list the same companies under different wrappers. Strak reads all of them from one registry and scores every pool the same way.</p>
+          <a class="btn btn-gray" href="/app">See the board <svg viewBox="0 0 16 16"><path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" /></svg></a>
+        </div>
+        <div class="r-vis vis-grid" data-r>
+          <div class="beam" aria-hidden="true"></div>
+          <div class="tiles" id="tiles"></div>
+          <div class="tile-hero"><img src="/brand/mark-160.webp" alt="" width="70" height="77"></div>
+        </div>
+      </div>
+
+      <div class="r5050">
+        <div class="r-text" data-r>
+          <div class="tags"><span>Price gap</span><span>Same company</span></div>
+          <h3>One stock, several wrappers, one price</h3>
+          <p>When the same company trades under two issuers, both pools should agree on the price. When they don't, one of them is not pricing the stock. The terminal lines them up side by side.</p>
+          <a class="btn btn-gray" href="/app">Compare wrappers <svg viewBox="0 0 16 16"><path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" /></svg></a>
+        </div>
+        <div class="r-vis vis-list" data-r>
+          <div class="vl-head"><span>Same stock, different issuer</span><a href="/app">Show all ↗</a></div>
+          <div class="vl-search"><span>Price gap between wrappers</span><svg viewBox="0 0 20 20"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4"/></svg></div>
+          <div class="vl-rows" id="pairRows"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── the three bands, as numbered steps ───────────────────── -->
+<section class="sec" id="bands">
+  <div class="col">
+    <div class="sec-head center">
+      <h2 class="split">Three bands, one verdict</h2>
+      <p class="sub" data-r>Every stock on the board falls into one of three bands. The count under each band is the registry right now.</p>
+    </div>
+    <div class="steps">
+      <article class="step" data-r>
+        <span class="num"><b>1</b></span>
+        <h3>Up to 12x</h3>
+        <p>Normal trading. Volume fits what the pool can carry.</p>
+        <em data-band="organic">·</em>
+      </article>
+      <article class="step" data-r>
+        <span class="num"><b>2</b></span>
+        <h3>12x to 50x</h3>
+        <p>Suspiciously hot. It can be news, it can be a loop.</p>
+        <em data-band="hot">·</em>
+      </article>
+      <article class="step printed" data-r>
+        <span class="num"><b>3</b></span>
+        <h3>Above 50x</h3>
+        <p>Volume is painted. Don't trust the price.</p>
+        <em data-band="printed">·</em>
+      </article>
+    </div>
+
+    <div class="center-cta" data-r><a class="btn btn-gray" href="/app">Open the board <svg viewBox="0 0 16 16"><path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" /></svg></a></div>
+  </div>
+</section>
+
+<!-- ── issuers, in the pricing layout ───────────────────────── -->
+<section class="sec" id="issuers">
+  <div class="col">
+    <div class="sec-head center">
+      <h2 class="split">Three issuers, one screen</h2>
+      <p class="sub" data-r>Who lists what, how much trades, and where the heat is right now.</p>
+    </div>
+    <div class="plans" id="plans"></div>
+  </div>
+</section>
+
+<!-- ── faq ──────────────────────────────────────────────────── -->
+<section class="sec" id="faq">
+  <div class="col">
+    <div class="sec-head center">
+      <h2 class="split">Your questions, answered</h2>
+      <p class="sub" data-r>The full method, data sources and API are in the <a href="/docs">documentation</a>.</p>
+    </div>
+    <div class="faq">
+      <details data-r>
+        <summary>What is Strak?</summary>
+        <p>A terminal for every tokenized stock on Solana: xStocks, Ondo and Backpack Securities on one screen. Next to price and volume it shows turnover, the one number that tells you whether that volume could be real.</p>
+      </details>
+      <details data-r>
+        <summary>Where do the numbers come from?</summary>
+        <p>Price, 24h volume and liquidity come from Jupiter's verified token list. Pools come from DexScreener, candles and sparklines from GeckoTerminal. The board is rebuilt from those sources every five minutes. Nothing is typed in by hand.</p>
+      </details>
+      <details data-r>
+        <summary>Why is high turnover a red flag?</summary>
+        <p>On a DEX the price is simply where the last trades left the pool. If a pool with $100K of liquidity reports $10M of volume, that depth changed hands a hundred times in a day. Real demand rarely does that. A loop of wash trades does, and the price it leaves behind is not a market price.</p>
+      </details>
+      <details data-r>
+        <summary>Which stocks are included?</summary>
+        <p>Tokens that Jupiter tags with an issuer (xStocks, Ondo or Backpack) and that hold at least $5K of liquidity. Copies that reuse a real ticker without the issuer tag are dropped. Empty listings with no pool are left out.</p>
+      </details>
+      <details data-r>
+        <summary>Does it cost anything?</summary>
+        <p>No. No wallet, no sign up, no token. Open the terminal and read.</p>
+      </details>
+      <details data-r>
+        <summary>Is this financial advice?</summary>
+        <p>No. Strak is a reading instrument. High turnover says the reported volume doesn't fit the pool, not what the stock will do next.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="sec end-sec">
+  <div class="col">
+    <div class="end" data-r>
+      <h2>Check the volume before you trust the price</h2>
+      <p class="sub">Every tokenized stock on Solana, scored the same way, refreshed every five minutes.</p>
+      <a class="btn btn-violet" href="/app">Open terminal <svg viewBox="0 0 16 16"><path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" /></svg></a>
+      <i class="end-line" aria-hidden="true"></i>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="col foot-in">
+    <div class="foot-brand">
+      <a class="logo" href="/" aria-label="Strak home">
+        <img src="/brand/mark-64.webp" alt="" width="20" height="22">
+        <span>Strak</span>
+      </a>
+      <p>Tokenized stocks on Solana. Is the volume real.</p>
+      <p class="copy">© 2026 Strak. Informational only, not financial advice.</p>
+    </div>
+    <div class="foot-cols">
+      <div>
+        <h4>Navigation</h4>
+        <a href="#board">Board</a>
+        <a href="#turnover">Turnover</a>
+        <a href="#bands">Bands</a>
+        <a href="#issuers">Issuers</a>
+      </div>
+      <div>
+        <h4>Data</h4>
+        <a href="/app">Terminal</a>
+        <a href="/docs">Documentation</a>
+        <a href="/docs#api">API</a>
+        <a href="/data/equities.json" target="_blank" rel="noopener">Raw data</a>
+        <a href="https://dev.jup.ag" target="_blank" rel="noopener">Jupiter</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="/landing.js" defer></script>
+</body>
+</html>

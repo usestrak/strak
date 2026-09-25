@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strak Docs · Method, data and API</title>
+<meta name="description" content="How Strak measures whether the volume behind a tokenized stock's price is real: turnover, the bands, the universe, data sources, field reference and the public API.">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0B0B10">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Strak">
+<meta property="og:title" content="Strak Docs · Method, data and API">
+<meta property="og:description" content="Turnover, the bands, the data sources and the API behind every number on Strak.">
+<meta property="og:image" content="https://strak-six.vercel.app/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://strak-six.vercel.app/og.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Ubuntu+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/" aria-label="Strak home">
+    <img src="/brand/mark-64.webp" alt="" width="20" height="22">
+    <span class="name">Strak</span>
+    <span class="sub">docs</span>
+  </a>
+  <label class="search">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="m14 14 4 4"/></svg>
+    <input id="q" type="search" placeholder="Search the docs" autocomplete="off" spellcheck="false" aria-label="Search the docs">
+    <kbd>/</kbd>
+  </label>
+  <nav class="top-links">
+    <a href="/">Home</a>
+    <a href="/app" class="btn">Open terminal</a>
+  </nav>
+  <button class="menu" id="menu" type="button" aria-label="Open navigation">Menu</button>
+</header>
+
+<div class="layout">
+
+<aside class="side" id="side">
+  <nav id="sideNav">
+    <p class="grp">Getting started</p>
+    <a href="#introduction">Introduction</a>
+    <a href="#quick-start">Quick start</a>
+    <a href="#the-terminal">Reading the terminal</a>
+    <p class="grp">Method</p>
+    <a href="#turnover">Turnover</a>
+    <a href="#bands">The three bands</a>
+    <a href="#limits">What turnover can't tell you</a>
+    <a href="#case-files">Case files</a>
+    <p class="grp">Data</p>
+    <a href="#universe">Universe and issuers</a>
+    <a href="#sources">Sources and refresh</a>
+    <a href="#fields">Field reference</a>
+    <p class="grp">Developers</p>
+    <a href="#api">API overview</a>
+    <a href="#api-registry">GET /api/registry</a>
+    <a href="#api-candles">GET /api/candles</a>
+    <a href="#api-sparks">GET /api/sparks</a>
+    <a href="#static-files">Static files</a>
+    <a href="#deep-links">Deep links</a>
+    <p class="grp">Reference</p>
+    <a href="#glossary">Glossary</a>
+    <a href="#changelog">Changelog</a>
+    <a href="#disclaimer">Disclaimer</a>
+  </nav>
+  <p class="side-empty" id="sideEmpty" hidden>Nothing matches.</p>
+</aside>
+
+<main class="doc" id="doc">
+
+<!-- ═══ Getting started ═══════════════════════════════════════════ -->
+
+<section id="introduction">
+  <p class="crumb">Getting started</p>
+  <h1>Strak documentation</h1>
+  <p class="lede">Strak is a terminal for every tokenized stock on Solana. Next to price and volume it shows one number no one else puts on the screen: <b>turnover</b>, the 24 hour volume divided by the liquidity behind it. Everyone shows the price. Strak shows whether it's lying.</p>
+
+  <div class="live-strip" aria-live="polite">
+    <div><i>Stocks on the board</i><b data-live="count">·</b></div>
+    <div><i>Volume, 24h</i><b data-live="vol">·</b></div>
+    <div><i>Above 12x now</i><b data-live="hot">·</b></div>
+    <div><i>Hottest now</i><b data-live="top">·</b></div>
+  </div>
+  <p class="fine">Numbers in this strip are read from <code>/api/registry</code> when the page loads.</p>
+
+  <h3 id="why">Why this exists</h3>
+  <p>A tokenized stock on Solana trades in an AMM pool. The price you see is simply where the last trades left that pool, and the 24h volume next to it is the sum of those trades. Both numbers are easy to inflate: a wallet that swaps back and forth with itself moves volume up and nudges the price wherever it likes, and nothing on a normal price screen tells you it happened.</p>
+  <p>There is one thing a loop can't hide: how many times it had to push the pool's entire depth through itself to produce that volume. Real demand for a stock rarely turns a pool over dozens of times a day. Strak measures exactly that, for every tokenized stock on the chain, and colours the board by it.</p>
+
+  <h3 id="who">Who it is for</h3>
+  <ul>
+    <li><b>Traders</b> who want to know whether a price has a market behind it before they trade against it.</li>
+    <li><b>Researchers and writers</b> who need a single, reproducible number for "this volume looks fake".</li>
+    <li><b>Builders</b> who want the whole tokenized equity universe on Solana as one clean JSON file.</li>
+  </ul>
+</section>
+
+<section id="quick-start">
+  <p class="crumb">Getting started</p>
+  <h2>Quick start</h2>
+  <ol class="steps">
+    <li><b>Open the <a href="/app">terminal</a>.</b> The board lists every stock, sorted by turnover, highest first.</li>
+    <li><b>Read the colour of the row.</b> No tint is normal trading. A violet edge means 12x to 50x. A green glow means above 50x: the volume is painted.</li>
+    <li><b>Click a stock.</b> The detail panel shows the verdict bar, candles, pool depth and how often the whole pool changes hands.</li>
+    <li><b>Check the wrappers.</b> If the same company trades under another issuer, the prices are listed side by side. A wide gap means one of the pools is not pricing the stock.</li>
+    <li><b>Verify on chain.</b> Every stock links to its mint and its pool on Solscan.</li>
+  </ol>
+  <div class="note"><b>No account, no wallet.</b> Strak is read-only. It never asks to connect a wallet and never places a trade.</div>
+</section>
+
+<section id="the-terminal">
+  <p class="crumb">Getting started</p>
+  <h2>Reading the terminal</h2>
+
+  <h3 id="t-board">The board</h3>
+  <p>Each row is one tokenized stock: its symbol, name and issuer dot, price, 24h change, 24h volume and turnover. The row's tint follows the turnover band. Above the table:</p>
+  <ul>
+    <li><b>Issuer tabs:</b> All, Backpack, xStocks, Ondo, each with its live count.</li>
+    <li><b>Search:</b> matches symbol (<code>NVDAx</code>), plain ticker (<code>NVDA</code>) or company name.</li>
+    <li><b>Sort:</b> Turnover, Volume, Depth (liquidity), Change, A to Z.</li>
+    <li><b>Above 12x only:</b> hides everything in the normal band.</li>
+  </ul>
+  <p>The tape across the top runs the 24 highest turnovers with their 24h change. The status pill shows the US equity session in New York time (pre-market, open, after hours, closed), because the stocks these tokens track only move on news and fundamentals during that session.</p>
+
+  <h3 id="t-detail">The detail panel</h3>
+  <table>
+    <thead><tr><th>Block</th><th>What it shows</th></tr></thead>
+    <tbody>
+      <tr><td>Verdict bar</td><td>Turnover on a log scale from 0.1x to 200x, with marks at 12x and 50x, the band name and a one-line reading.</td></tr>
+      <tr><td>Chart</td><td>Candles for the stock's deepest pool at 15m, 1h, 4h or 1D, with volume underneath.</td></tr>
+      <tr><td>Volume 24h</td><td>Buy plus sell volume across the token's pools, in USD.</td></tr>
+      <tr><td>Pool liquidity</td><td>USD liquidity behind the token.</td></tr>
+      <tr><td>Pool turns over every</td><td>1440 minutes divided by turnover: how often, at this pace, the whole depth changes hands.</td></tr>
+      <tr><td>Trades 24h</td><td>Number of buys plus sells.</td></tr>
+      <tr><td>Holders</td><td>Wallets holding the token.</td></tr>
+      <tr><td>Jupiter organic score</td><td>Jupiter's own 0 to 100 estimate of how organic the token's activity is. Shown for reference; Strak does not use it in turnover.</td></tr>
+      <tr><td>Other issuers</td><td>The same company under other wrappers: price, difference from the selected one, turnover.</td></tr>
+      <tr><td>Links</td><td>Token and pool on Solscan, the pair on DexScreener, and which DEX and quote asset the pool uses.</td></tr>
+    </tbody>
+  </table>
+  <p>The board refreshes itself every two minutes. The timestamp under the table says whether you are looking at the live registry or the static snapshot.</p>
+</section>
+
+<!-- ═══ Method ════════════════════════════════════════════════════ -->
+
+<section id="turnover">
+  <p class="crumb">Method</p>
+  <h2>Turnover</h2>
+  <p>Turnover is the whole product in one ratio:</p>
+  <div class="formula"><span class="f-out">turnover</span><em>=</em><span>volume 24h</span><em>÷</em><span>liquidity</span></div>
+  <p>Both inputs are in US dollars and cover the same token over the same 24 hours, so the ratio has no unit. It reads as "how many times did the traded volume cover the depth behind the price". A turnover of 3x means the day's trades added up to three times the pool.</p>
+
+  <h3 id="t-minutes">Turnover as time</h3>
+  <p>A ratio is easy to compute and hard to feel. Strak also shows it as time: if a day has 1440 minutes and the pool turned over <i>t</i> times, the whole depth changed hands once every <code>1440 / t</code> minutes.</p>
+  <table class="compact">
+    <thead><tr><th>Turnover</th><th>Whole pool changes hands every</th></tr></thead>
+    <tbody>
+      <tr><td>1x</td><td>24 hours</td></tr>
+      <tr><td>3x</td><td>8 hours</td></tr>
+      <tr><td>12x</td><td>2 hours</td></tr>
+      <tr><td>50x</td><td>29 minutes</td></tr>
+      <tr><td>150x</td><td>under 10 minutes</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="t-example">A worked example</h3>
+  <div class="example" id="liveExample">
+    <p class="ex-k">Live, from the registry</p>
+    <p>Loading the hottest stock on the board…</p>
+  </div>
+
+  <h3 id="t-precision">Precision</h3>
+  <p>Turnover is computed once per registry build and rounded to two decimals. Volume and liquidity come from the same Jupiter record, so both sides of the ratio are always from the same moment.</p>
+</section>
+
+<section id="bands">
+  <p class="crumb">Method</p>
+  <h2>The three bands</h2>
+  <p>Every stock falls into one of three bands. The counts are live.</p>
+  <div class="bands">
+    <div class="band b1"><span class="rng">up to 12x</span><b>Normal trading</b><p>Volume fits what the pool can carry. The whole depth changes hands no faster than every two hours.</p><em data-band="organic">·</em></div>
+    <div class="band b2"><span class="rng">12x to 50x</span><b>Suspiciously hot</b><p>Volume runs far ahead of depth. It can be news or an earnings day, it can be a loop. Open the chart before trusting the price.</p><em data-band="hot">·</em></div>
+    <div class="band b3"><span class="rng">above 50x</span><b>Volume is painted</b><p>The pool would have to change hands more than twice an hour, around the clock. Treat the price as unquoted.</p><em data-band="printed">·</em></div>
+  </div>
+  <h3 id="b-why">Why 12x and 50x</h3>
+  <p>The thresholds are heuristics, not laws of nature, and they are stated in the open so anyone can argue with them. They come from turning the ratio into time:</p>
+  <ul>
+    <li><b>12x</b> is a full turn of the pool every two hours for 24 hours straight, including the hours when the underlying US market is closed and nothing new is known about the company. A busy, healthy pool can get there on a big news day; it rarely stays there.</li>
+    <li><b>50x</b> is a full turn every half hour, all day and all night. At that pace the same dollars would have to cross the pool again and again. Real demand for a stock does not look like that. A loop of trades does.</li>
+  </ul>
+  <p>Values are compared with <code>&gt; 12</code> and <code>&gt; 50</code>: exactly 12.00x is still normal, exactly 50.00x is still hot.</p>
+</section>
+
+<section id="limits">
+  <p class="crumb">Method</p>
+  <h2>What turnover can't tell you</h2>
+  <p>Turnover is a screen, not a verdict from a court. Read it with these limits in mind:</p>
+  <ul>
+    <li><b>High is not proof.</b> Earnings, index news or a sudden re-rating can push an honest pool into the hot band for a day. Look at the chart and at the other wrappers before concluding anything.</li>
+    <li><b>Low is not a clean bill.</b> A pool can be manipulated with little volume, for example by one large trade in a thin pool. Low turnover only says the volume is plausible.</li>
+    <li><b>Thin pools are noisy.</b> A stock needs at least $5K of liquidity to be on the board, but near that floor a single trade moves the ratio a lot.</li>
+    <li><b>24 hours is a window.</b> A burst an hour ago and a steady day can produce the same number. The candles show which it was.</li>
+    <li><b>Aggregator data.</b> Volume and liquidity are Jupiter's figures for the token across its pools. Strak does not recount swaps itself; every figure links to the chain so it can be checked.</li>
+  </ul>
+</section>
+
+<section id="case-files">
+  <p class="crumb">Method</p>
+  <h2>Case files</h2>
+  <p>Dated snapshots from past registry runs. They are not live data, and each one carries the date of the run it came from.</p>
+  <article class="case">
+    <header><span class="case-d">23.09.2026</span><span class="tag printed">Volume is painted</span></header>
+    <h3 id="case-ionq">IONQ, Backpack Securities: 152.4x</h3>
+    <div class="case-grid">
+      <div><i>Volume 24h</i><b>$16.5M</b></div>
+      <div><i>Liquidity</i><b>$107K</b></div>
+      <div><i>Turnover</i><b class="mint">152.4x</b></div>
+      <div><i>Pool turns every</i><b>9 min</b></div>
+    </div>
+    <p>On the first registry run, IONQ from Backpack Securities reported $16.5M of volume against $107K of liquidity. To produce that honestly, the whole pool would have had to change hands roughly every nine minutes for a full day. It was the highest turnover on the board by a wide margin; the next stock was around 33x.</p>
+    <p>Two days later, on 25.09.2026, the same token read 3.7x: $413K of volume on $111K of liquidity. The depth barely moved. The volume fell by a factor of forty.</p>
+  </article>
+</section>
+
+<!-- ═══ Data ══════════════════════════════════════════════════════ -->
+
+<section id="universe">
+  <p class="crumb">Data</p>
+  <h2>Universe and issuers</h2>
+  <p>Strak covers tokenized stocks from three issuers. Each one names its tokens its own way, which is how the same company can appear two or three times.</p>
+  <table>
+    <thead><tr><th>Issuer</th><th>Jupiter tag</th><th>Ticker style</th><th>On the board now</th></tr></thead>
+    <tbody>
+      <tr><td><i class="idot backpack"></i>Backpack Securities</td><td><code>backpack</code></td><td>no suffix: <code>IONQ</code>, <code>HIMS</code></td><td data-live="n-backpack">·</td></tr>
+      <tr><td><i class="idot xstocks"></i>xStocks (Backed)</td><td><code>xstocks</code></td><td>suffix x: <code>NVDAx</code>, <code>SPYx</code></td><td data-live="n-xstocks">·</td></tr>
+      <tr><td><i class="idot ondo"></i>Ondo Global Markets</td><td><code>ondo</code></td><td>suffix on: <code>SPYon</code></td><td data-live="n-ondo">·</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="u-rules">Inclusion rules</h3>
+  <p>A token is on the board when all of these hold:</p>
+  <ol>
+    <li>It is in Jupiter's <b>verified</b> token list.</li>
+    <li>It carries one of the issuer tags above.</li>
+    <li>It does <b>not</b> carry the <code>unknown</code> tag. Copies that reuse a real ticker are tagged this way and are dropped.</li>
+    <li>It has at least <b>$5,000</b> of liquidity. Below that a pool is decoration, not a market. Issuers mint many listings nobody trades; this rule removes them.</li>
+    <li>It is the <b>deepest</b> listing of its ticker for that issuer. If an issuer has two tokens with the same ticker, the one with more liquidity stays.</li>
+  </ol>
+  <p>Tokens tagged as stocks but without an issuer tag are not included.</p>
+
+  <h3 id="u-tickers">Tickers and symbols</h3>
+  <p>Every record carries two names. <code>symbol</code> is the token's own symbol (<code>NVDAx</code>). <code>ticker</code> is the plain company ticker with the issuer suffix removed (<code>NVDA</code>). The terminal groups wrappers of one company by <code>ticker</code>.</p>
+</section>
+
+<section id="sources">
+  <p class="crumb">Data</p>
+  <h2>Sources and refresh</h2>
+  <p>Every number comes from a public, free API. Nothing is typed in by hand.</p>
+  <table>
+    <thead><tr><th>Source</th><th>What Strak takes</th><th>Refresh</th></tr></thead>
+    <tbody>
+      <tr><td>Jupiter verified token list</td><td>The universe, price, 24h buy and sell volume, 24h price change, liquidity, trade count, holders, organic score, icon</td><td>Registry rebuilt on request, cached 5 min</td></tr>
+      <tr><td>DexScreener</td><td>The deepest pool per token, its DEX and quote asset, the pool's 24h, 6h and 1h price change</td><td>With the registry</td></tr>
+      <tr><td>GeckoTerminal</td><td>OHLCV candles for the terminal chart and the landing sparklines</td><td>Candles cached 45 s, sparklines 30 min</td></tr>
+    </tbody>
+  </table>
+  <h3 id="s-pipeline">The pipeline</h3>
+  <ol>
+    <li>Fetch Jupiter's verified list (one request, about 3,600 tokens).</li>
+    <li>Filter by the inclusion rules and collapse duplicates.</li>
+    <li>Ask DexScreener for the pairs of the remaining mints, 30 per request, and keep the deepest pair of each.</li>
+    <li>Compute turnover and sort by volume.</li>
+  </ol>
+  <p>A full build takes a few seconds. The CDN keeps each answer for five minutes, so one build serves every visitor in that window. If the upstreams fail, the site falls back to the static snapshot in <code>/data/equities.json</code>, and the terminal labels the board as a snapshot instead of live.</p>
+  <div class="note"><b>Volume and the chart are different scopes.</b> Turnover uses Jupiter's token-level volume and liquidity. The chart and the pool link point to the single deepest pool from DexScreener. For most stocks the deepest pool carries nearly all of the trading; where it doesn't, the numbers under the chart are still the token-level ones.</div>
+</section>
+
+<section id="fields">
+  <p class="crumb">Data</p>
+  <h2>Field reference</h2>
+  <p>Each entry in <code>equities</code> has these fields. Money is in US dollars.</p>
+  <table class="fields">
+    <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>address</code></td><td>string</td><td>Token mint address, base58.</td></tr>
+      <tr><td><code>symbol</code></td><td>string</td><td>Token symbol as the issuer minted it, e.g. <code>NVDAx</code>.</td></tr>
+      <tr><td><code>ticker</code></td><td>string</td><td>Company ticker without the issuer suffix, e.g. <code>NVDA</code>.</td></tr>
+      <tr><td><code>name</code></td><td>string</td><td>Token name.</td></tr>
+      <tr><td><code>issuer</code></td><td>string</td><td><code>backpack</code>, <code>xstocks</code> or <code>ondo</code>.</td></tr>
+      <tr><td><code>price</code></td><td>number</td><td>Price in USD.</td></tr>
+      <tr><td><code>liq</code></td><td>number</td><td>Liquidity in USD.</td></tr>
+      <tr><td><code>vol24</code></td><td>number</td><td>24h buy volume plus sell volume, USD.</td></tr>
+      <tr><td><code>turnover</code></td><td>number</td><td><code>vol24 / liq</code>, two decimals.</td></tr>
+      <tr><td><code>change24</code></td><td>number</td><td>24h price change, percent.</td></tr>
+      <tr><td><code>txns24</code></td><td>number</td><td>24h buys plus sells.</td></tr>
+      <tr><td><code>holders</code></td><td>number</td><td>Holder count.</td></tr>
+      <tr><td><code>organic</code></td><td>number</td><td>Jupiter organic score, 0 to 100.</td></tr>
+      <tr><td><code>icon</code></td><td>string | null</td><td>Logo URL from the token metadata.</td></tr>
+      <tr><td><code>pool</code></td><td>string</td><td>Address of the deepest pool. Missing when no pool was found.</td></tr>
+      <tr><td><code>dex</code></td><td>string</td><td>DEX of that pool, e.g. <code>raydium</code>, <code>orca</code>, <code>meteora</code>.</td></tr>
+      <tr><td><code>quote</code></td><td>string</td><td>The other asset in the pool, e.g. <code>USDC</code>, <code>SOL</code>.</td></tr>
+      <tr><td><code>createdMs</code></td><td>number | null</td><td>When the pool was created, Unix milliseconds.</td></tr>
+      <tr><td><code>pc</code></td><td>number[]</td><td>The pool's price change over 24h, 6h and 1h, percent, in that order.</td></tr>
+    </tbody>
+  </table>
+  <p>The envelope around the list:</p>
+  <pre><code>{
+  "updatedAt": 1790370000000,     // when this build ran, Unix ms
+  "chain": { "name": "Solana", "id": "solana" },
+  "count": 93,
+  "equities": [ … ],
+  "live": true                    // only on /api/registry
+}</code></pre>
+</section>
+
+<!-- ═══ Developers ════════════════════════════════════════════════ -->
+
+<section id="api">
+  <p class="crumb">Developers</p>
+  <h2>API overview</h2>
+  <p>The same endpoints the site runs on are open to anyone. No key, no sign up. Responses are JSON, served from the site's own origin with CDN caching.</p>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Returns</th><th>Cached</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/registry</code></td><td>The live board</td><td>5 min</td></tr>
+      <tr><td><code>GET /api/candles</code></td><td>OHLCV for one pool</td><td>45 s</td></tr>
+      <tr><td><code>GET /api/sparks</code></td><td>24 hourly closes for the landing's pools</td><td>30 min</td></tr>
+      <tr><td><code>GET /data/equities.json</code></td><td>Static snapshot of the board</td><td>60 s</td></tr>
+      <tr><td><code>GET /data/cases.json</code></td><td>Dated case files</td><td>60 s</td></tr>
+    </tbody>
+  </table>
+  <div class="note warn"><b>Be gentle.</b> The upstreams behind these routes are free and rate limited. Poll the registry no faster than every few minutes; faster polling returns the same cached answer anyway.</div>
+</section>
+
+<section id="api-registry">
+  <p class="crumb">Developers</p>
+  <h2><code>GET /api/registry</code></h2>
+  <p>Builds the board from Jupiter and DexScreener and returns it in the shape described in <a href="#fields">Field reference</a>, with <code>"live": true</code>.</p>
+  <div class="code"><div class="code-h"><span>curl</span><button class="copy">Copy</button></div><pre><code>curl -s https://strak-six.vercel.app/api/registry | jq '.equities | sort_by(-.turnover) | .[0:5] | map({symbol, turnover})'</code></pre></div>
+  <div class="code"><div class="code-h"><span>JavaScript</span><button class="copy">Copy</button></div><pre><code>const res = await fetch('https://strak-six.vercel.app/api/registry');
+const { equities, updatedAt } = await res.json();
+
+const hot = equities.filter((e) => e.turnover > 12);
+console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOString()}`);</code></pre></div>
+  <table class="compact">
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>200</code></td><td>The board. Cache-Control: <code>s-maxage=300, stale-while-revalidate=900</code>.</td></tr>
+      <tr><td><code>502</code></td><td><code>{"error": "registry unavailable"}</code>. Upstream down; fall back to <code>/data/equities.json</code>.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="api-candles">
+  <p class="crumb">Developers</p>
+  <h2><code>GET /api/candles</code></h2>
+  <p>A proxy for GeckoTerminal OHLCV on Solana. It exists because GeckoTerminal answers browsers with a 429 and no CORS headers, which a browser reports as a CORS failure.</p>
+  <table class="fields">
+    <thead><tr><th>Param</th><th>Default</th><th>Rules</th></tr></thead>
+    <tbody>
+      <tr><td><code>pool</code></td><td>required</td><td>Pool address, base58, 32 to 44 characters.</td></tr>
+      <tr><td><code>token</code></td><td>none</td><td>Mint to price in. Pass the stock's <code>address</code> so candles are in the stock's price, not the quote asset's.</td></tr>
+      <tr><td><code>tf</code></td><td><code>hour</code></td><td><code>minute</code>, <code>hour</code> or <code>day</code>.</td></tr>
+      <tr><td><code>agg</code></td><td><code>1</code></td><td>Candles per bar, 1 to 30. <code>tf=minute&amp;agg=15</code> is 15 minute candles.</td></tr>
+      <tr><td><code>limit</code></td><td><code>200</code></td><td>Number of candles, 10 to 1000.</td></tr>
+    </tbody>
+  </table>
+  <div class="code"><div class="code-h"><span>curl</span><button class="copy">Copy</button></div><pre><code id="candlesCurl">curl -s "https://strak-six.vercel.app/api/candles?pool=&lt;pool&gt;&amp;token=&lt;mint&gt;&amp;tf=hour&amp;agg=4&amp;limit=100"</code></pre></div>
+  <p>Answer: <code>{"ohlcv": [[time, open, high, low, close, volume], …]}</code>, newest first, time in Unix seconds, prices and volume in USD.</p>
+  <table class="compact">
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>400</code></td><td><code>bad pool</code>, <code>bad token</code> or <code>bad timeframe</code>.</td></tr>
+      <tr><td><code>429</code></td><td>GeckoTerminal is rate limiting. Retry after a few seconds.</td></tr>
+      <tr><td><code>502</code></td><td>Upstream error or unreachable.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="api-sparks">
+  <p class="crumb">Developers</p>
+  <h2><code>GET /api/sparks</code></h2>
+  <p>24 hourly closes for the pools the landing page draws sparklines for: the 8 highest turnovers and the 22 most traded stocks. It takes no parameters on purpose: one constant URL means the CDN holds one answer for half an hour, and the whole site costs GeckoTerminal about 30 calls per half hour.</p>
+  <pre><code>{
+  "sparks": { "&lt;pool&gt;": [44.1, 44.3, …, 44.9] },   // oldest first
+  "count": 25,                                  // pools answered
+  "of": 25                                      // pools asked
+}</code></pre>
+  <p>When fewer than 60% of pools answered, the response is cached for one minute instead of thirty, so a rate-limited batch is not pinned. Where a pool has no candles, the landing draws a coarse line from the pool's own <code>pc</code> field: four real points at 24h, 6h, 1h and now.</p>
+</section>
+
+<section id="static-files">
+  <p class="crumb">Developers</p>
+  <h2>Static files</h2>
+  <p><code>/data/equities.json</code> is the board as of the last deploy, in the same shape as the live route without <code>live</code>. Use it as a fallback or when you need a fixed snapshot. <code>/data/cases.json</code> holds the dated case files.</p>
+  <p>To build your own snapshot locally:</p>
+  <div class="code"><div class="code-h"><span>shell</span><button class="copy">Copy</button></div><pre><code>node scripts/build-registry.mjs</code></pre></div>
+  <p>It prints the count per issuer, the total volume and every stock above 12x, and writes <code>public/data/equities.json</code>.</p>
+</section>
+
+<section id="deep-links">
+  <p class="crumb">Developers</p>
+  <h2>Deep links</h2>
+  <p>Link straight to a stock or an issuer. Useful for posts, bots and research notes.</p>
+  <table>
+    <thead><tr><th>Link</th><th>Opens</th></tr></thead>
+    <tbody>
+      <tr><td><code>/app#NVDAx</code></td><td>That exact token.</td></tr>
+      <tr><td><code>/app#NVDA</code></td><td>The deepest wrapper of that company.</td></tr>
+      <tr><td><code>/app#issuer=backpack</code></td><td>The board filtered to one issuer: <code>backpack</code>, <code>xstocks</code> or <code>ondo</code>.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══ Reference ═════════════════════════════════════════════════ -->
+
+<section id="glossary">
+  <p class="crumb">Reference</p>
+  <h2>Glossary</h2>
+  <dl class="gloss">
+    <dt>AMM pool</dt><dd>A smart contract holding two assets, for example a stock token and USDC. The price is set by the ratio of the two, and every trade moves it.</dd>
+    <dt>Liquidity</dt><dd>The USD value sitting in the pools behind a token. It is how much a trade can lean on before the price moves a lot.</dd>
+    <dt>Volume, 24h</dt><dd>The USD value of all buys and sells of the token in the last 24 hours.</dd>
+    <dt>Turnover</dt><dd>Volume divided by liquidity. How many times the day's trading covered the depth.</dd>
+    <dt>Wash trading</dt><dd>Trading with yourself, or with a friendly counterparty, to create volume and move a price without real demand.</dd>
+    <dt>Issuer</dt><dd>The company that holds the real shares and mints the token that tracks them: Backpack Securities, Backed (xStocks) or Ondo.</dd>
+    <dt>Wrapper</dt><dd>One issuer's token for a company. NVDAx is the xStocks wrapper of NVIDIA.</dd>
+    <dt>Price gap</dt><dd>The difference between two wrappers of the same company. Both track the same share, so a wide gap means one pool is not pricing it.</dd>
+    <dt>Mint</dt><dd>A token's address on Solana.</dd>
+  </dl>
+</section>
+
+<section id="changelog">
+  <p class="crumb">Reference</p>
+  <h2>Changelog</h2>
+  <div class="log">
+    <div><time>26.09.2026</time><p>Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
+    <div><time>25.09.2026</time><p>Strak goes live: the terminal, the landing and a live registry route that rebuilds the board every five minutes.</p></div>
+    <div><time>23.09.2026</time><p>First registry run: 90 stocks from three issuers. IONQ at 152.4x becomes the first case file.</p></div>
+  </div>
+</section>
+
+<section id="disclaimer">
+  <p class="crumb">Reference</p>
+  <h2>Disclaimer</h2>
+  <p>Strak is an informational tool. Nothing on this site is financial advice, an offer or a recommendation to buy or sell anything. Turnover describes how reported volume relates to pool depth; it does not predict prices and it does not prove misconduct. Data comes from third parties and can be late, incomplete or wrong. Check anything that matters on chain before acting on it.</p>
+</section>
+
+<nav class="pager" id="pager"></nav>
+<footer class="doc-foot">
+  <span>Strak · Tokenized stocks on Solana. Is the volume real.</span>
+  <a href="/app">Open terminal →</a>
+</footer>
+</main>
+
+<aside class="toc" id="toc">
+  <p>On this page</p>
+  <nav id="tocNav"></nav>
+</aside>
+
+</div>
+
+<script src="/docs.js" defer></script>
+</body>
+</html>

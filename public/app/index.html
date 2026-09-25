@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strak terminal · Tokenized stocks on Solana</title>
+<meta name="description" content="Every tokenized stock on Solana with the turnover that says whether the volume is real.">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0B0B10">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Strak">
+<meta property="og:title" content="Strak terminal · Is the volume real">
+<meta property="og:description" content="Every tokenized stock on Solana: xStocks, Ondo, Backpack. Turnover shows whether the volume behind a price is real.">
+<meta property="og:image" content="https://strak-six.vercel.app/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Ubuntu+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app/styles.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/" aria-label="Strak home">
+    <img src="/brand/mark-64.webp" alt="" width="20" height="22">
+    <span class="name">Strak</span>
+    <span class="sub">terminal</span>
+  </a>
+  <div class="status">
+    <span class="pill" id="phasePill">·</span>
+    <span class="stat"><i>stocks</i><b id="sCount">·</b></span>
+    <span class="stat"><i>vol 24h</i><b id="sVol">·</b></span>
+    <span class="stat hot"><i>above 12x</i><b id="sHot">·</b></span>
+    <a class="docs-link" href="/docs">Docs</a>
+  </div>
+</header>
+
+<div class="tape-strip" aria-label="Turnover tape"><div class="tape-track" id="tapeTrack"></div></div>
+
+<nav class="tabs" id="tabs" aria-label="Issuer">
+  <button data-issuer="all" class="on">All <em id="cAll">·</em></button>
+  <button data-issuer="backpack"><i class="idot backpack"></i>Backpack <em id="cBackpack">·</em></button>
+  <button data-issuer="xstocks"><i class="idot xstocks"></i>xStocks <em id="cXstocks">·</em></button>
+  <button data-issuer="ondo"><i class="idot ondo"></i>Ondo <em id="cOndo">·</em></button>
+</nav>
+
+<main class="wrap" id="wrap">
+
+  <section class="board" id="board">
+    <div class="board-head">
+      <div class="search">
+        <input id="q" type="search" placeholder="Search ticker or company" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="sorts" id="sorts"></div>
+    </div>
+
+    <div class="thead" id="thead"></div>
+    <div class="rows" id="rows"></div>
+    <div class="board-foot"><span id="rowCount">·</span><span id="updated">·</span></div>
+  </section>
+
+  <section class="detail" id="detail">
+    <button class="back" id="back" type="button">← Markets</button>
+
+    <div class="detail-head">
+      <div class="detail-id">
+        <img class="d-ico" id="dIcon" alt="" hidden>
+        <div>
+          <h1 id="dTicker">·</h1>
+          <p><span id="dName">select a market</span> <span class="iss-badge" id="dIssuer"></span></p>
+        </div>
+      </div>
+      <div class="price-block">
+        <div class="px" id="dPrice">·</div>
+        <div class="chg" id="dChange"></div>
+      </div>
+    </div>
+
+    <!-- the verdict strip: the reason this terminal exists -->
+    <div class="verdict" id="verdict" hidden>
+      <div class="verdict-bar"><i id="verdictFill"></i><s style="left:var(--p12)"></s><s style="left:var(--p50)"></s></div>
+      <div class="verdict-scale"><span style="left:var(--p12)">12x</span><span style="left:var(--p50)">50x</span></div>
+      <div class="verdict-text">
+        <b id="verdictVal">·</b>
+        <span id="verdictWord">·</span>
+        <em id="verdictWhy"></em>
+      </div>
+    </div>
+
+    <div class="chart-wrap" id="chartWrap">
+      <div class="chart-bar">
+        <div class="tfs" id="tfs">
+          <button data-tf="minute" data-agg="1">1m</button>
+          <button data-tf="minute" data-agg="5">5m</button>
+          <button data-tf="minute" data-agg="15" class="on">15m</button>
+          <button data-tf="hour" data-agg="1">1h</button>
+          <button data-tf="hour" data-agg="4">4h</button>
+          <button data-tf="day" data-agg="1">1D</button>
+        </div>
+        <span class="chart-live"><b class="live-dot"></b>live</span>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div id="chart"></div>
+      <div class="chart-empty" id="chartEmpty">no candles for this pool</div>
+    </div>
+
+    <div class="metrics" id="metrics"></div>
+
+    <!-- who makes the volume -->
+    <div class="who" id="who" hidden>
+      <p class="compare-title">Who trades this pool</p>
+      <div id="whoOut"></div>
+    </div>
+
+    <!-- one company, several wrappers -->
+    <div class="compare" id="compare" hidden>
+      <p class="compare-title">Same stock, other issuers</p>
+      <div class="compare-rows" id="compareRows"></div>
+    </div>
+
+    <div class="links">
+      <a id="lToken" target="_blank" rel="noopener">Token on Solscan</a>
+      <a id="lPool" target="_blank" rel="noopener">Pool on Solscan</a>
+      <a id="lDex" target="_blank" rel="noopener">DexScreener</a>
+      <span class="quote" id="dQuote"></span>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>Data: Jupiter verified list, DexScreener pools, GeckoTerminal candles. Rebuilt every five minutes.</span>
+  <span class="foot-note">Informational only. Not financial advice.</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="/app/app.js"></script>
+</body>
+</html>

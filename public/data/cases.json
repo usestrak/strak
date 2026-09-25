@@ -1,0 +1,14 @@
+{
+ "note": "Dated snapshots from past registry runs. Not live data: every case carries the date of the run it came from.",
+ "cases": [
+  {
+   "date": "2026-09-23",
+   "ticker": "IONQ",
+   "symbol": "IONQ",
+   "issuer": "backpack",
+   "turnover": 152.4,
+   "vol24": 16500000,
+   "liq": 107000
+  }
+ ]
+}

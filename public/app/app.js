@@ -1,0 +1,511 @@
+/* Strak terminal.
+   Every tokenized stock on Solana on one board, coloured by turnover: 24h volume over pool depth.
+   The board comes from /api/registry (live, CDN-cached) with /data/equities.json as the fallback.
+   Candles go through /api/candles, because GeckoTerminal answers the browser with a 429 and no CORS. */
+
+const SOLSCAN = 'https://solscan.io';
+const DEXSCREENER = 'https://dexscreener.com/solana';
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const ISSUER = {
+  backpack: 'Backpack Securities',
+  xstocks: 'xStocks',
+  ondo: 'Ondo Global Markets',
+};
+
+const state = {
+  equities: [],
+  updatedAt: 0,
+  live: false,
+  issuer: 'all',
+  selected: null,
+  sort: 'turn',
+  onlySuspect: false,
+  q: '',
+  tf: { tf: 'minute', agg: 15 },
+};
+
+/* ── format ─────────────────────────────────────── */
+const usd = (n) => {
+  if (!Number.isFinite(n) || n === 0) return '·';
+  const a = Math.abs(n);
+  if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(2);
+};
+const price = (n) => {
+  if (!Number.isFinite(n) || n === 0) return '·';
+  if (n >= 1000) return n.toFixed(1);
+  if (n >= 1) return n.toFixed(2);
+  if (n >= 0.01) return n.toFixed(4);
+  return n.toPrecision(3);
+};
+const pct = (n) => (Number.isFinite(n) ? (n >= 0 ? '+' : '') + n.toFixed(2) + '%' : '·');
+const cls = (n) => (n > 0 ? 'up' : n < 0 ? 'down' : 'muted');
+
+/* Turnover: 24h volume over pool depth. The whole product in one ratio.
+   Under 12 a market is doing what a market does; past 50 the volume is larger than the pool can
+   organically carry, which is the signature of the same coins going in a circle. */
+const turnover = (e) => (e.liq > 0 ? e.vol24 / e.liq : null);
+const band = (t) => (t == null ? null : t > 50 ? 'printed' : t > 12 ? 'hot' : 'organic');
+const BAND_WORD = { organic: 'normal trading', hot: 'suspiciously hot', printed: 'volume is painted' };
+const BAND_WHY = {
+  organic: 'volume fits what this pool can carry',
+  hot: 'volume is running far ahead of depth, check the chart before trusting the price',
+  printed: 'more volume than the pool can physically turn over, treat the price as unquoted',
+};
+// log placement so 0.1x..200x all read on one bar
+const barPos = (t) => Math.max(1, Math.min(99, (Math.log10(Math.max(t, .1)) + 1) / (Math.log10(200) + 1) * 100));
+
+function marketPhase() {
+  const ny = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const d = ny.getDay(), m = ny.getHours() * 60 + ny.getMinutes();
+  if (d === 0 || d === 6) return { label: 'US WEEKEND · CLOSED', open: false };
+  if (m >= 570 && m < 960) return { label: 'US MARKET OPEN', open: true };
+  if (m >= 240 && m < 570) return { label: 'PRE-MARKET', open: false };
+  if (m >= 960 && m < 1200) return { label: 'AFTER HOURS', open: false };
+  return { label: 'US MARKET CLOSED', open: false };
+}
+
+/* ── data ───────────────────────────────────────── */
+async function fetchRegistry() {
+  for (const url of ['/api/registry', '/data/equities.json']) {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j?.equities?.length) return j;
+    } catch {}
+  }
+  return null;
+}
+
+function stampUpdated() {
+  const age = Math.max(0, Math.round((Date.now() - state.updatedAt) / 1000));
+  const when = age < 90 ? `${age}s ago` : age < 5400 ? `${Math.round(age / 60)}m ago`
+    : new Date(state.updatedAt).toISOString().slice(0, 10);
+  $('updated').textContent = (state.live ? 'live · ' : 'snapshot · ') + when;
+}
+
+function applyRegistry(j) {
+  const byAddr = new Map(state.equities.map((e) => [e.address, e]));
+  state.equities = j.equities.map((n) => Object.assign(byAddr.get(n.address) || {}, n));
+  state.updatedAt = j.updatedAt;
+  state.live = !!j.live;
+  if (state.selected) state.selected = state.equities.find((e) => e.address === state.selected.address) || state.selected;
+  paintCounts();
+  stampUpdated();
+}
+
+function paintCounts() {
+  const L = state.equities;
+  const n = (k) => L.filter((e) => e.issuer === k).length;
+  $('cAll').textContent = L.length;
+  $('cBackpack').textContent = n('backpack');
+  $('cXstocks').textContent = n('xstocks');
+  $('cOndo').textContent = n('ondo');
+  $('sCount').textContent = L.length;
+  $('sVol').textContent = usd(L.reduce((a, e) => a + e.vol24, 0));
+  $('sHot').textContent = L.filter((e) => (turnover(e) || 0) > 12).length;
+}
+
+async function refresh() {
+  const j = await fetchRegistry();
+  if (!j) return;
+  applyRegistry(j);
+  render();
+  buildTape();
+  if (state.selected) paintDetail(state.selected);
+}
+
+/* ── board ──────────────────────────────────────── */
+const COLS = [['Stock', ''], ['Price', 'r'], ['24h', 'r c-chg'], ['Volume', 'r'], ['Turnover', 'r']];
+const SORTS = [['turn', 'Turnover'], ['vol24', 'Volume'], ['liq', 'Depth'], ['change24', 'Change'], ['ticker', 'A to Z']];
+
+const match = (e) => {
+  const q = state.q.trim().toLowerCase();
+  return !q || e.symbol.toLowerCase().includes(q) || e.ticker.toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q);
+};
+
+function rows() {
+  let l = state.equities.filter(match);
+  if (state.issuer !== 'all') l = l.filter((e) => e.issuer === state.issuer);
+  if (state.onlySuspect) l = l.filter((e) => (turnover(e) || 0) > 12);
+  const s = state.sort;
+  return l.sort((a, b) => (s === 'ticker' ? a.ticker.localeCompare(b.ticker)
+    : s === 'turn' ? (turnover(b) || 0) - (turnover(a) || 0)
+    : (b[s] || 0) - (a[s] || 0)));
+}
+
+function cells(e) {
+  const t = turnover(e), bd = band(t);
+  const ico = e.icon ? `<img class="ico" src="${esc(e.icon)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : '<span class="ico"></span>';
+  return [
+    `<span class="tk">${ico}<div><b>${esc(e.symbol)}<i class="idot ${e.issuer}" title="${ISSUER[e.issuer]}"></i></b><i>${esc(e.name || '')}</i></div></span>`,
+    `<span class="r">${price(e.price)}</span>`,
+    `<span class="r c-chg ${cls(e.change24)}">${pct(e.change24)}</span>`,
+    `<span class="r">${usd(e.vol24)}</span>`,
+    `<span class="r"><b class="turn ${bd || ''}">${t == null ? '·' : t.toFixed(1) + 'x'}</b></span>`,
+  ];
+}
+
+function render() {
+  const list = rows();
+  $('thead').innerHTML = COLS.map(([c, k]) => `<span class="${k}">${c}</span>`).join('');
+  $('sorts').innerHTML = SORTS.map(([k, label]) =>
+    `<button data-sort="${k}"${state.sort === k ? ' class="on"' : ''}>${label}</button>`).join('') +
+    `<button data-filter="suspect" class="flt${state.onlySuspect ? ' on' : ''}">Above 12x only</button>`;
+
+  const box = $('rows');
+  box.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const e of list) {
+    const div = document.createElement('div');
+    const bd = band(turnover(e));
+    div.className = 'row' + (bd && bd !== 'organic' ? ' ' + bd : '') + (state.selected?.address === e.address ? ' on' : '');
+    div.innerHTML = cells(e).join('');
+    div.onclick = () => select(e);
+    frag.appendChild(div);
+  }
+  box.appendChild(frag);
+  if (!list.length) box.innerHTML = '<div class="empty-rows">nothing matches</div>';
+  $('rowCount').textContent = list.length + ' listed';
+}
+
+/* ── detail ─────────────────────────────────────── */
+function select(e, opts = {}) {
+  state.selected = e;
+  document.body.classList.add('has-detail');
+  render();
+  paintDetail(e);
+  loadCandles(e);
+  loadWho(e);
+  if (!opts.silent) history.replaceState(null, '', '#' + e.symbol);
+}
+
+function paintDetail(e) {
+  $('dTicker').textContent = e.symbol;
+  $('dName').textContent = e.name || '';
+  $('dIssuer').innerHTML = `<i class="idot ${e.issuer}"></i>${ISSUER[e.issuer] || e.issuer}`;
+  const ic = $('dIcon');
+  if (e.icon) { ic.src = e.icon; ic.hidden = false; ic.onerror = () => { ic.hidden = true; }; } else ic.hidden = true;
+  $('dPrice').textContent = e.price ? '$' + price(e.price) : '·';
+  const chg = $('dChange');
+  chg.textContent = e.change24 ? pct(e.change24) + ' 24h' : '';
+  chg.className = 'chg ' + cls(e.change24);
+
+  const t = turnover(e), bd = band(t);
+  const box = $('verdict');
+  if (t == null) box.hidden = true;
+  else {
+    box.hidden = false;
+    box.className = 'verdict ' + bd;
+    box.style.setProperty('--p12', barPos(12) + '%');
+    box.style.setProperty('--p50', barPos(50) + '%');
+    $('verdictFill').style.width = barPos(t) + '%';
+    $('verdictVal').textContent = t.toFixed(1) + 'x';
+    $('verdictWord').textContent = BAND_WORD[bd];
+    $('verdictWhy').textContent = BAND_WHY[bd];
+  }
+
+  const m = [];
+  if (e.vol24) m.push(['Volume 24h', usd(e.vol24)]);
+  if (e.liq) m.push(['Pool liquidity', usd(e.liq)]);
+  if (t) {
+    const mins = 1440 / t;
+    m.push(['Pool turns over every', mins < 90 ? Math.round(mins) + ' min' : mins < 1440 ? (mins / 60).toFixed(1) + ' h' : (mins / 1440).toFixed(1) + ' days']);
+  }
+  if (e.txns24) m.push(['Trades 24h', e.txns24.toLocaleString('en-US')]);
+  if (e.holders) m.push(['Holders', e.holders.toLocaleString('en-US')]);
+  if (e.organic) m.push(['Jupiter organic score', Math.round(e.organic) + ' / 100']);
+  $('metrics').innerHTML = m.map(([k, v]) => `<div class="metric"><i>${k}</i><b>${v}</b></div>`).join('');
+
+  paintCompare(e);
+
+  $('lToken').href = `${SOLSCAN}/token/${e.address}`;
+  $('lPool').href = e.pool ? `${SOLSCAN}/account/${e.pool}` : '#';
+  $('lPool').hidden = !e.pool;
+  $('lDex').href = e.pool ? `${DEXSCREENER}/${e.pool}` : `${DEXSCREENER}/${e.address}`;
+  $('dQuote').textContent = e.pool ? `pool: ${e.dex || '?'} · quoted in ${e.quote || '?'}` : 'no pool found';
+}
+
+/* One company, several wrappers (IONQ, IONQx, IONQon): the prices should agree. When they don't,
+   one of the pools is not pricing the stock. */
+function paintCompare(e) {
+  const sibs = state.equities.filter((x) => x.ticker === e.ticker);
+  const box = $('compare');
+  if (sibs.length < 2) { box.hidden = true; return; }
+  box.hidden = false;
+  $('compareRows').innerHTML = sibs.map((x) => {
+    const diff = e.price && x.price ? (x.price / e.price - 1) * 100 : null;
+    const t = turnover(x);
+    return `<button data-addr="${x.address}" class="${x.address === e.address ? 'self' : ''}">` +
+      `<span class="nm"><i class="idot ${x.issuer}"></i>${esc(x.symbol)}</span>` +
+      `<span class="r">$${price(x.price)}</span>` +
+      `<span class="r ${x.address === e.address ? 'muted' : cls(diff)}">${x.address === e.address ? 'this one' : pct(diff)}</span>` +
+      `<span class="r"><b class="turn ${band(t) || ''}">${t == null ? '·' : t.toFixed(1) + 'x'}</b></span></button>`;
+  }).join('');
+}
+
+/* ── chart: TradingView Lightweight Charts, updated live ─────────────
+   Candles come newest first from GeckoTerminal. Times are shifted to the viewer's clock, the
+   price scale ignores lone spike prints (a wick far outside the bodies is drawn, but off scale),
+   and the last bars are re-pulled every 15 to 60 seconds so the chart moves while you watch. */
+const TZ = -new Date().getTimezoneOffset() * 60;
+const CH = { chart: null, candle: null, vol: null, data: [], timer: null, key: '' };
+
+function robustScale(original) {
+  const r = CH.chart?.timeScale().getVisibleLogicalRange();
+  const D = CH.data;
+  if (!r || !D.length) return original();
+  const a = Math.max(0, Math.floor(r.from)), b = Math.min(D.length - 1, Math.ceil(r.to));
+  if (b < a) return original();
+  let lo = Infinity, hi = -Infinity, wlo = Infinity, whi = -Infinity;
+  for (let i = a; i <= b; i++) {
+    const c = D[i];
+    lo = Math.min(lo, c.open, c.close); hi = Math.max(hi, c.open, c.close);
+    wlo = Math.min(wlo, c.low); whi = Math.max(whi, c.high);
+  }
+  const span = (hi - lo) || hi * 0.002 || 1;
+  return { priceRange: { minValue: Math.max(wlo, lo - span * 0.6), maxValue: Math.min(whi, hi + span * 0.6) }, margins: { above: 10, below: 10 } };
+}
+
+function precisionFor(p) { return p >= 1000 ? 2 : p >= 1 ? 2 : p >= 0.01 ? 4 : 6; }
+
+function initChart() {
+  if (CH.chart || !window.LightweightCharts) return;
+  const LC = window.LightweightCharts;
+  CH.chart = LC.createChart($('chart'), {
+    autoSize: true,
+    layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(225,215,255,.55)', fontFamily: '"Ubuntu Sans Mono", ui-monospace, monospace', fontSize: 11 },
+    grid: { vertLines: { color: 'rgba(255,255,255,.035)' }, horzLines: { color: 'rgba(255,255,255,.035)' } },
+    crosshair: {
+      mode: LC.CrosshairMode.Normal,
+      vertLine: { color: 'rgba(201,166,255,.35)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2A1D52' },
+      horzLine: { color: 'rgba(201,166,255,.35)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2A1D52' },
+    },
+    rightPriceScale: { borderColor: 'rgba(255,255,255,.07)', scaleMargins: { top: 0.08, bottom: 0.24 } },
+    timeScale: { borderColor: 'rgba(255,255,255,.07)', timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7, minBarSpacing: 2 },
+    handleScroll: { vertTouchDrag: false },
+  });
+  CH.candle = CH.chart.addCandlestickSeries({
+    upColor: '#2EBD85', downColor: '#F6465D', borderVisible: false, wickUpColor: '#2EBD85', wickDownColor: '#F6465D',
+    priceLineColor: 'rgba(201,166,255,.7)', priceLineStyle: LC.LineStyle.Dashed,
+    autoscaleInfoProvider: robustScale,
+  });
+  CH.vol = CH.chart.addHistogramSeries({ priceScaleId: '', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+  CH.vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+  CH.chart.subscribeCrosshairMove((p) => legend(p?.time ? CH.data.find((c) => c.time === p.time) : null));
+}
+
+const toBar = (c) => ({ time: c[0] + TZ, open: +c[1], high: +c[2], low: +c[3], close: +c[4], value: +c[5] });
+const volBar = (b) => ({ time: b.time, value: b.value, color: b.close >= b.open ? 'rgba(46,189,133,.35)' : 'rgba(246,70,93,.35)' });
+
+function legend(bar) {
+  const b = bar || CH.data[CH.data.length - 1];
+  const e = state.selected;
+  if (!b || !e) { $('legend').innerHTML = ''; return; }
+  const ch = b.open ? (b.close / b.open - 1) * 100 : 0;
+  const c = ch >= 0 ? 'up' : 'down';
+  $('legend').innerHTML = `<b>${esc(e.symbol)}</b><span class="tfl">${$('tfs').querySelector('.on')?.textContent || ''}</span>` +
+    `<span>O <em class="${c}">${price(b.open)}</em></span><span>H <em class="${c}">${price(b.high)}</em></span>` +
+    `<span>L <em class="${c}">${price(b.low)}</em></span><span>C <em class="${c}">${price(b.close)}</em></span>` +
+    `<span class="${c}">${pct(ch)}</span><span>Vol <em>${usd(b.value)}</em></span>`;
+}
+
+async function candles(pool, token, tf, agg) {
+  try {
+    const r = await fetch(`/api/candles?pool=${pool}&token=${token}&tf=${tf}&agg=${agg}&limit=300`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j.ohlcv || [];
+  } catch { return null; }
+}
+
+async function loadCandles(e) {
+  initChart();
+  const wrap = $('chartWrap');
+  clearInterval(CH.timer);
+  CH.data = [];
+  CH.candle?.setData([]); CH.vol?.setData([]);
+  legend(null);
+  wrap.classList.remove('empty');
+  if (!e.pool) { $('chartEmpty').textContent = 'no pool for this token'; wrap.classList.add('empty'); return; }
+  $('chartEmpty').textContent = 'loading candles';
+  wrap.classList.add('loading');
+  const { tf, agg } = state.tf;
+  const key = `${e.pool}:${tf}:${agg}`;
+  CH.key = key;
+  const list = await candles(e.pool, e.address, tf, agg);
+  if (CH.key !== key) return;   // user moved on
+  wrap.classList.remove('loading');
+  if (!list?.length) { $('chartEmpty').textContent = list ? 'no candles for this pool right now' : 'candles are rate limited, retrying'; wrap.classList.add('empty'); }
+  else {
+    CH.data = list.map(toBar).reverse();
+    const p = precisionFor(CH.data[CH.data.length - 1].close);
+    CH.candle.applyOptions({ priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } });
+    CH.candle.setData(CH.data);
+    CH.vol.setData(CH.data.map(volBar));
+    CH.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, CH.data.length - 120), to: CH.data.length + 4 });
+    legend(null);
+  }
+  // live: pull the latest bars again; the proxy caches 45 s, so faster polling buys nothing
+  const every = tf === 'minute' ? 20000 : 60000;
+  CH.timer = setInterval(() => tick(e, key), every);
+}
+
+async function tick(e, key) {
+  if (document.hidden || CH.key !== key) return;
+  const { tf, agg } = state.tf;
+  const list = await candles(e.pool, e.address, tf, agg);
+  if (CH.key !== key || !list?.length) return;
+  const bars = list.map(toBar).reverse();
+  if (!CH.data.length) { loadCandles(e); return; }
+  const last = CH.data[CH.data.length - 1].time;
+  for (const b of bars) {
+    if (b.time < last) continue;
+    CH.candle.update(b);
+    CH.vol.update(volBar(b));
+    if (b.time === CH.data[CH.data.length - 1].time) CH.data[CH.data.length - 1] = b; else CH.data.push(b);
+  }
+  legend(null);
+  // the last trade is the freshest price there is
+  const lp = CH.data[CH.data.length - 1].close;
+  const el = $('dPrice');
+  const txt = '$' + price(lp);
+  if (el.textContent !== txt) {
+    const up = parseFloat(el.textContent.slice(1)) < lp;
+    el.textContent = txt;
+    el.classList.remove('flash-up', 'flash-down'); void el.offsetWidth; el.classList.add(up ? 'flash-up' : 'flash-down');
+  }
+}
+
+/* ── who trades this pool ─────────────────────── */
+const shortW = (w) => w.slice(0, 4) + '…' + w.slice(-4);
+const cash = (n) => (n >= 1000 ? usd(n) : '$' + n.toFixed(2));
+let whoTimer = null;
+async function loadWho(e) {
+  clearInterval(whoTimer);
+  const box = $('who');
+  if (!e.pool) { box.hidden = true; return; }
+  box.hidden = false;
+  const run = async () => {
+    if (document.hidden) return;
+    try {
+      const r = await fetch(`/api/trades?pool=${e.pool}`);
+      if (state.selected?.address !== e.address) return;
+      if (!r.ok) { $('whoOut').innerHTML = '<p class="muted">swaps are rate limited right now, retrying</p>'; return; }
+      const { stats: s } = await r.json();
+      const max = s.top[0]?.usd || 1;
+      $('whoOut').innerHTML = `
+        <div class="who-stats">
+          <div><i>Trades a minute</i><b>${s.perMin == null ? '·' : s.perMin.toFixed(1)}</b></div>
+          <div><i>Median trade</i><b>${cash(s.median)}</b></div>
+          <div><i>Wallets</i><b>${s.wallets}</b></div>
+          <div><i>Top 3 wallets</i><b class="${s.top3Share > .5 ? 'hot' : ''}">${(s.top3Share * 100).toFixed(1)}%</b></div>
+          <div><i>Bought and sold</i><b>${s.roundTripWallets} · ${(s.roundTripShare * 100).toFixed(1)}%</b></div>
+        </div>
+        <div class="who-top">${s.top.map((w, i) => `<a href="https://solscan.io/account/${w.wallet}" target="_blank" rel="noopener"><span>#${i + 1} ${shortW(w.wallet)}</span><em>${w.buy} buy · ${w.sell} sell</em><b>${cash(w.usd)}</b><i style="width:${(w.usd / max * 100).toFixed(1)}%"></i></a>`).join('')}</div>
+        <p class="who-note">Last ${s.count} swaps, ${s.minutes < 90 ? Math.round(s.minutes) + ' min' : (s.minutes / 60).toFixed(1) + ' h'} of trading. Refreshes every 30 s.</p>`;
+    } catch {}
+  };
+  $('whoOut').innerHTML = '<p class="muted">reading the last 300 swaps…</p>';
+  await run();
+  whoTimer = setInterval(run, 30000);
+}
+
+/* ── tape: highest turnover first ───────────────── */
+function buildTape() {
+  const top = [...state.equities].sort((a, b) => (turnover(b) || 0) - (turnover(a) || 0)).slice(0, 24);
+  const html = top.map((e) => {
+    const t = turnover(e);
+    return `<a href="#${encodeURIComponent(e.symbol)}"><i class="idot ${e.issuer}"></i><b>${esc(e.symbol)}</b>` +
+      `<span class="${band(t)}">${t.toFixed(1)}x</span><span class="${cls(e.change24)}">${pct(e.change24)}</span></a>`;
+  }).join('');
+  $('tapeTrack').innerHTML = html + html;
+}
+
+/* ── wiring ─────────────────────────────────────── */
+function wire() {
+  $('q').addEventListener('input', (e) => { state.q = e.target.value; render(); });
+
+  $('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.issuer = b.dataset.issuer;
+    [...$('tabs').children].forEach((c) => c.classList.toggle('on', c === b));
+    render();
+  });
+
+  $('sorts').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.filter === 'suspect') state.onlySuspect = !state.onlySuspect;
+    else state.sort = b.dataset.sort;
+    render();
+  });
+
+  $('tfs').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    state.tf = { tf: b.dataset.tf, agg: +b.dataset.agg };
+    [...$('tfs').children].forEach((c) => c.classList.toggle('on', c === b));
+    if (state.selected) loadCandles(state.selected);
+  });
+
+  $('compareRows').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || b.classList.contains('self')) return;
+    const hit = state.equities.find((x) => x.address === b.dataset.addr);
+    if (hit) select(hit);
+  });
+
+  // On a phone the board and the chart cannot share a screen: selecting swaps to the detail,
+  // and this button swaps back.
+  $('back').addEventListener('click', () => {
+    document.body.classList.remove('has-detail');
+    history.replaceState(null, '', location.pathname);
+  });
+
+  window.addEventListener('hashchange', openFromHash);
+}
+
+/* Deep link: /app#IONQ or /app#NVDAx opens straight on that market, so a post can point at one name.
+   The exact symbol wins; a bare ticker falls back to its deepest wrapper. */
+function openFromHash() {
+  const t = decodeURIComponent(location.hash.replace('#', '')).trim().toLowerCase();
+  if (!t) return false;
+  // /app#issuer=backpack opens the board filtered to one issuer
+  const iss = t.match(/^issuer=(\w+)$/);
+  if (iss) {
+    const b = document.querySelector(`#tabs button[data-issuer="${iss[1]}"]`);
+    if (b) b.click();
+    return false;
+  }
+  const hit = state.equities.find((e) => e.symbol.toLowerCase() === t)
+    || state.equities.filter((e) => e.ticker.toLowerCase() === t).sort((a, b) => b.liq - a.liq)[0];
+  if (!hit) return false;
+  select(hit, { silent: true });
+  return true;
+}
+
+async function main() {
+  const ph = marketPhase();
+  $('phasePill').textContent = ph.label;
+  $('phasePill').className = 'pill ' + (ph.open ? 'open' : 'closed');
+
+  wire();
+  const j = await fetchRegistry();
+  if (!j) { $('rows').innerHTML = '<div class="empty-rows">registry unavailable, try again in a minute</div>'; return; }
+  applyRegistry(j);
+  render();
+  buildTape();
+
+  if (!openFromHash() && state.equities.length && window.innerWidth > 900) {
+    select(rows()[0], { silent: true });
+  }
+
+  setInterval(refresh, 120000);   // the CDN entry lives five minutes; polling faster buys nothing
+  setInterval(stampUpdated, 30000);
+}
+
+main();

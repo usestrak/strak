@@ -309,3 +309,6 @@ body {
   .thead .c-chg, .row .c-chg { display: none; }
   .links .quote { margin-left: 0; }
 }
+
+.foot a { color: var(--dim); text-decoration: none; }
+.foot a:hover { color: #fff; }

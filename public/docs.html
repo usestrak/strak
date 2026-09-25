@@ -52,6 +52,7 @@
     <p class="grp">Method</p>
     <a href="#turnover">Turnover</a>
     <a href="#bands">The three bands</a>
+    <a href="#who">Who makes the volume</a>
     <a href="#limits">What turnover can't tell you</a>
     <a href="#case-files">Case files</a>
     <p class="grp">Data</p>
@@ -62,6 +63,7 @@
     <a href="#api">API overview</a>
     <a href="#api-registry">GET /api/registry</a>
     <a href="#api-candles">GET /api/candles</a>
+    <a href="#api-trades">GET /api/trades</a>
     <a href="#api-sparks">GET /api/sparks</a>
     <a href="#static-files">Static files and source</a>
     <a href="#deep-links">Deep links</a>
@@ -90,11 +92,11 @@
   </div>
   <p class="fine">Numbers in this strip are read from <code>/api/registry</code> when the page loads.</p>
 
-  <h3 id="why">Why this exists</h3>
+  <h3 id="why-this-exists">Why this exists</h3>
   <p>A tokenized stock on Solana trades in an AMM pool. The price you see is simply where the last trades left that pool, and the 24h volume next to it is the sum of those trades. Both numbers are easy to inflate: a wallet that swaps back and forth with itself moves volume up and nudges the price wherever it likes, and nothing on a normal price screen tells you it happened.</p>
   <p>There is one thing a loop can't hide: how many times it had to push the pool's entire depth through itself to produce that volume. Real demand for a stock rarely turns a pool over dozens of times a day. Strak measures exactly that, for every tokenized stock on the chain, and colours the board by it.</p>
 
-  <h3 id="who">Who it is for</h3>
+  <h3 id="who-it-is-for">Who it is for</h3>
   <ul>
     <li><b>Traders</b> who want to know whether a price has a market behind it before they trade against it.</li>
     <li><b>Researchers and writers</b> who need a single, reproducible number for "this volume looks fake".</li>
@@ -134,13 +136,14 @@
     <thead><tr><th>Block</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td>Verdict bar</td><td>Turnover on a log scale from 0.1x to 200x, with marks at 12x and 50x, the band name and a one-line reading.</td></tr>
-      <tr><td>Chart</td><td>Candles for the stock's deepest pool at 15m, 1h, 4h or 1D, with volume underneath.</td></tr>
+      <tr><td>Chart</td><td>Candles for the stock's deepest pool at 1m, 5m, 15m, 1h, 4h or 1D, with volume underneath and MA7 and MA25 over the top. New candles arrive every 20 to 60 seconds while the chart is open.</td></tr>
       <tr><td>Volume 24h</td><td>Buy plus sell volume across the token's pools, in USD.</td></tr>
       <tr><td>Pool liquidity</td><td>USD liquidity behind the token.</td></tr>
       <tr><td>Pool turns over every</td><td>1440 minutes divided by turnover: how often, at this pace, the whole depth changes hands.</td></tr>
       <tr><td>Trades 24h</td><td>Number of buys plus sells.</td></tr>
       <tr><td>Holders</td><td>Wallets holding the token.</td></tr>
       <tr><td>Jupiter organic score</td><td>Jupiter's own 0 to 100 estimate of how organic the token's activity is. Shown for reference; Strak does not use it in turnover.</td></tr>
+      <tr><td>Who trades this pool</td><td>The last 300 swaps: trades a minute, median trade, distinct wallets, the share carried by the top three, and how many wallets both bought and sold. Refreshes every 30 seconds.</td></tr>
       <tr><td>Other issuers</td><td>The same company under other wrappers: price, difference from the selected one, turnover.</td></tr>
       <tr><td>Links</td><td>Token and pool on Solscan, the pair on DexScreener, and which DEX and quote asset the pool uses.</td></tr>
     </tbody>
@@ -196,6 +199,26 @@
     <li><b>50x</b> is a full turn every half hour, all day and all night. At that pace the same dollars would have to cross the pool again and again. Real demand for a stock does not look like that. A loop of trades does.</li>
   </ul>
   <p>Values are compared with <code>&gt; 12</code> and <code>&gt; 50</code>: exactly 12.00x is still normal, exactly 50.00x is still hot.</p>
+</section>
+
+<section id="who">
+  <p class="crumb">Method</p>
+  <h2>Who makes the volume</h2>
+  <p>Turnover says the volume does not fit the pool. It does not say who is producing it. For that, Strak reads the pool's last 300 swaps and groups them by wallet. Four numbers come out, and together they separate a busy market from a loop.</p>
+
+  <table>
+    <thead><tr><th>Number</th><th>What it means</th><th>What a loop looks like</th></tr></thead>
+    <tbody>
+      <tr><td>Distinct wallets</td><td>How many addresses traded in the window.</td><td>Few wallets carrying a lot of volume.</td></tr>
+      <tr><td>Top 3 share</td><td>Share of the window's volume carried by the three biggest wallets.</td><td>Above half, sustained.</td></tr>
+      <tr><td>Bought and sold</td><td>Wallets that did both inside the same window, and the share of volume they carry.</td><td>A round trip is what wash trading is made of.</td></tr>
+      <tr><td>Trades a minute, median trade</td><td>The pace, and the size of a typical trade.</td><td>A fast, even drum of near-identical small trades.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note"><b>None of these is proof on its own.</b> Market makers quote both sides for a living, so a wallet that bought and sold is doing its job, not necessarily faking. Arbitrage between two wrappers of the same stock also shows up as round trips. Read these next to turnover, not instead of it.</div>
+
+  <p>The same numbers are on the landing page for the hottest pools, updating every 20 seconds, and under every chart in the terminal. Through the API they come from <a href="#api-trades"><code>/api/trades</code></a>.</p>
 </section>
 
 <section id="limits">
@@ -331,6 +354,7 @@
     <tbody>
       <tr><td><code>GET /api/registry</code></td><td>The live board</td><td>5 min</td></tr>
       <tr><td><code>GET /api/candles</code></td><td>OHLCV for one pool</td><td>45 s</td></tr>
+      <tr><td><code>GET /api/trades</code></td><td>The last swaps in a pool and who made them</td><td>20 s</td></tr>
       <tr><td><code>GET /api/sparks</code></td><td>24 hourly closes for the landing's pools</td><td>30 min</td></tr>
       <tr><td><code>GET /data/equities.json</code></td><td>Static snapshot of the board</td><td>60 s</td></tr>
       <tr><td><code>GET /data/cases.json</code></td><td>Dated case files</td><td>60 s</td></tr>
@@ -382,6 +406,37 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
       <tr><td><code>502</code></td><td>Upstream error or unreachable.</td></tr>
     </tbody>
   </table>
+</section>
+
+<section id="api-trades">
+  <p class="crumb">Developers</p>
+  <h2><code>GET /api/trades</code></h2>
+  <p>The last 300 swaps in one pool, newest first, with the wallet behind each and a summary of who is carrying the volume. Source is GeckoTerminal, proxied for the same reason as the candles.</p>
+  <table class="fields">
+    <thead><tr><th>Param</th><th>Default</th><th>Rules</th></tr></thead>
+    <tbody>
+      <tr><td><code>pool</code></td><td>required</td><td>Pool address, base58, 32 to 44 characters.</td></tr>
+    </tbody>
+  </table>
+  <div class="code"><div class="code-h"><span>curl</span><button class="copy">Copy</button></div><pre><code id="tradesCurl">curl -s "https://strak-six.vercel.app/api/trades?pool=&lt;pool&gt;" | jq .stats</code></pre></div>
+  <pre><code>{
+  "trades": [
+    { "t": 1790372807000, "kind": "buy", "usd": 23.87, "wallet": "H9fi…enKm", "tx": "5XVj…EdJ9" }
+  ],
+  "stats": {
+    "count": 300,          // swaps read
+    "usd": 37988.96,       // their total value
+    "wallets": 189,        // distinct addresses
+    "minutes": 10.2,       // how long those 300 swaps took
+    "perMin": 29.46,
+    "median": 43.12,       // median trade, USD
+    "top3Share": 0.3782,   // share of volume carried by the three biggest wallets
+    "roundTripWallets": 37,
+    "roundTripShare": 0.1337,
+    "top": [ { "wallet": "4K9G…BLrs", "usd": 5711.27, "n": 3, "buy": 3, "sell": 0 } ]
+  }
+}</code></pre>
+  <p>Only the 60 most recent swaps are returned in <code>trades</code>; <code>stats</code> always covers all 300. Statuses match the candles route: <code>400</code> for a bad address, <code>429</code> when the upstream is rate limiting, <code>502</code> otherwise.</p>
 </section>
 
 <section id="api-sparks">
@@ -442,7 +497,7 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
   <p class="crumb">Reference</p>
   <h2>Changelog</h2>
   <div class="log">
-    <div><time>26.09.2026</time><p>Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
+    <div><time>26.09.2026</time><p>Swaps per pool: who makes the volume, on the landing and under every chart. Candles moved to a proper trading chart with 1m to 1D timeframes and moving averages. <a href="https://github.com/usestrak/strak">Source opened</a>, with an hourly snapshot of the whole board. Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
     <div><time>25.09.2026</time><p>Strak goes live: the terminal, the landing and a live registry route that rebuilds the board every five minutes.</p></div>
     <div><time>23.09.2026</time><p>First registry run: 90 stocks from three issuers. IONQ at 152.4x becomes the first case file.</p></div>
   </div>

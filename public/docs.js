@@ -59,7 +59,11 @@ async function live() {
       <p><code>${usd(top.vol24)} ÷ ${usd(top.liq)} = ${tx(top.turnover)}</code>. That puts it in the <b>${WORD[b]}</b> band: at this pace the whole pool changes hands every ${every(top.turnover)}.</p>`;
   }
   const withPool = L.find((e) => e.pool);
-  if (withPool) $('candlesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/candles?pool=${withPool.pool}&token=${withPool.address}&tf=hour&agg=4&limit=100"`;
+  if (withPool) {
+    $('candlesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/candles?pool=${withPool.pool}&token=${withPool.address}&tf=hour&agg=4&limit=100"`;
+    const busiest = top || withPool;
+    if (busiest.pool) $('tradesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/trades?pool=${busiest.pool}" | jq .stats`;
+  }
 }
 
 /* ── headings: anchors, this-page list, active state ── */

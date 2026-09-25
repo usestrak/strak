@@ -223,14 +223,20 @@ body {
 .chart-live { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; color: var(--dim2); }
 .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 0 rgba(60,255,170,.6); animation: pulse 2s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 7px rgba(60,255,170,0); } 100% { box-shadow: 0 0 0 0 rgba(60,255,170,0); } }
-.legend { position: absolute; left: 20px; top: 50px; z-index: 3; pointer-events: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--mono); font-size: 11.5px; color: var(--dim2); }
-.legend b { color: #fff; font-weight: 600; }
+.legend { position: absolute; left: 20px; top: 50px; z-index: 3; pointer-events: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-family: var(--mono); font-size: 11.5px; color: var(--dim2); }
+.legend .lg-id { display: inline-flex; align-items: baseline; gap: 7px; }
+.legend b { color: #fff; font-weight: 600; font-size: 13px; }
 .legend .tfl { color: var(--dim); }
+.legend .lg-ohlc em { margin-right: 2px; }
+.legend .lg-ma { font-size: 11px; }
+.legend .ma7 { color: #C9A6FF; }
+.legend .ma25 { color: #5B8CFF; }
+.legend .lg-vol { color: var(--dim); }
 .legend em { font-style: normal; }
 .legend .up, .legend em.up { color: #2EBD85; }
 .legend .down, .legend em.down { color: #F6465D; }
 .legend em:not(.up):not(.down) { color: var(--text); }
-#chart { width: 100%; height: 360px; }
+#chart { width: 100%; height: 400px; }
 .chart-empty {
   position: absolute; inset: 46px 12px 12px;
   display: none; align-items: center; justify-content: center;
@@ -256,7 +262,7 @@ body {
 .who-top i { position: absolute; left: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #6E3BE8, #C9A6FF); }
 .who-note { margin: 10px 0 0; font-family: var(--mono); font-size: 11px; color: var(--dim2); }
 .who .muted { font-family: var(--mono); font-size: 12px; margin: 4px 0; }
-@media (max-width: 900px) { .who-stats { grid-template-columns: repeat(2, 1fr); } #chart { height: 300px; } }
+@media (max-width: 900px) { .who-stats { grid-template-columns: repeat(2, 1fr); } #chart { height: 320px; } .legend { font-size: 10.5px; gap: 3px 10px; } .legend .lg-ohlc { width: 100%; } }
 
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .metric { border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; background: var(--bg2); }

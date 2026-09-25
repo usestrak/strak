@@ -35,7 +35,8 @@ body {
 ::selection { background: var(--violet); color: #fff; }
 a { color: #D9C8FF; text-decoration: none; }
 a:hover { color: #fff; }
-code { font: 500 .88em/1 var(--mono); padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.06); color: #E8DEFF; white-space: nowrap; }
+code { font: 500 .88em/1.45 var(--mono); padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.06); color: #E8DEFF;
+       white-space: pre-wrap; overflow-wrap: anywhere; }   /* a long token must wrap, not widen the page */
 .idot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; background: var(--dot-backpack); }
 .idot.xstocks { background: var(--dot-xstocks); }
 .idot.ondo { background: var(--dot-ondo); }
@@ -138,7 +139,7 @@ table.compact { width: auto; min-width: 360px; }
 table.fields td:first-child code { color: #fff; }
 
 pre { margin: 8px 0 20px; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--edge); background: #07060D; overflow-x: auto; font: 400 13px/21px var(--mono); color: #E8DEFF; }
-pre code { padding: 0; background: none; font: inherit; white-space: pre; }
+pre code { padding: 0; background: none; font: inherit; white-space: pre; overflow-wrap: normal; }
 .code { margin: 8px 0 20px; border-radius: 12px; border: 1px solid var(--edge); background: #07060D; overflow: hidden; }
 .code pre { margin: 0; border: 0; border-radius: 0; }
 .code-h { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 8px 18px; border-bottom: 1px solid var(--edge); font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--lav2); }

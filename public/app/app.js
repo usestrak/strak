@@ -255,7 +255,7 @@ function paintCompare(e) {
    price scale ignores lone spike prints (a wick far outside the bodies is drawn, but off scale),
    and the last bars are re-pulled every 15 to 60 seconds so the chart moves while you watch. */
 const TZ = -new Date().getTimezoneOffset() * 60;
-const CH = { chart: null, candle: null, vol: null, data: [], timer: null, key: '' };
+const CH = { chart: null, candle: null, vol: null, ma7: null, ma25: null, data: [], timer: null, key: '' };
 
 function robustScale(original) {
   const r = CH.chart?.timeScale().getVisibleLogicalRange();
@@ -270,7 +270,11 @@ function robustScale(original) {
     wlo = Math.min(wlo, c.low); whi = Math.max(whi, c.high);
   }
   const span = (hi - lo) || hi * 0.002 || 1;
-  return { priceRange: { minValue: Math.max(wlo, lo - span * 0.6), maxValue: Math.min(whi, hi + span * 0.6) }, margins: { above: 10, below: 10 } };
+  const minValue = Math.max(wlo, lo - span * 0.6);
+  const maxValue = Math.min(whi, hi + span * 0.6);
+  // A range the library cannot draw throws and kills the chart; hand it back to the default instead.
+  if (![minValue, maxValue].every(Number.isFinite) || maxValue <= minValue) return original();
+  return { priceRange: { minValue, maxValue }, margins: { above: 10, below: 10 } };
 }
 
 function precisionFor(p) { return p >= 1000 ? 2 : p >= 1 ? 2 : p >= 0.01 ? 4 : 6; }
@@ -287,33 +291,65 @@ function initChart() {
       vertLine: { color: 'rgba(201,166,255,.35)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2A1D52' },
       horzLine: { color: 'rgba(201,166,255,.35)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2A1D52' },
     },
-    rightPriceScale: { borderColor: 'rgba(255,255,255,.07)', scaleMargins: { top: 0.08, bottom: 0.24 } },
-    timeScale: { borderColor: 'rgba(255,255,255,.07)', timeVisible: true, secondsVisible: false, rightOffset: 6, barSpacing: 7, minBarSpacing: 2 },
+    rightPriceScale: { borderColor: 'rgba(255,255,255,.07)', scaleMargins: { top: 0.12, bottom: 0.26 }, entireTextOnly: true },
+    timeScale: { borderColor: 'rgba(255,255,255,.07)', timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 10, minBarSpacing: 3 },
     handleScroll: { vertTouchDrag: false },
   });
+  // Volume first, so the candles draw over it rather than under.
+  CH.vol = CH.chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+  CH.vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+  // Moving averages: the two lines every trading screen carries, so the trend reads at a glance.
+  CH.ma7 = CH.chart.addLineSeries({ color: '#C9A6FF', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  CH.ma25 = CH.chart.addLineSeries({ color: '#5B8CFF', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
   CH.candle = CH.chart.addCandlestickSeries({
     upColor: '#2EBD85', downColor: '#F6465D', borderVisible: false, wickUpColor: '#2EBD85', wickDownColor: '#F6465D',
-    priceLineColor: 'rgba(201,166,255,.7)', priceLineStyle: LC.LineStyle.Dashed,
+    priceLineColor: 'rgba(201,166,255,.8)', priceLineStyle: LC.LineStyle.Dashed, priceLineWidth: 1,
     autoscaleInfoProvider: robustScale,
   });
-  CH.vol = CH.chart.addHistogramSeries({ priceScaleId: '', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
-  CH.vol.priceScale().applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
   CH.chart.subscribeCrosshairMove((p) => legend(p?.time ? CH.data.find((c) => c.time === p.time) : null));
 }
 
-const toBar = (c) => ({ time: c[0] + TZ, open: +c[1], high: +c[2], low: +c[3], close: +c[4], value: +c[5] });
-const volBar = (b) => ({ time: b.time, value: b.value, color: b.close >= b.open ? 'rgba(46,189,133,.35)' : 'rgba(246,70,93,.35)' });
+// GeckoTerminal occasionally returns a row with a missing field; a NaN there throws inside the
+// charting library and takes the whole chart down, so bad rows are dropped on the way in.
+const toBar = (c) => ({ time: c[0] + TZ, open: +c[1], high: +c[2], low: +c[3], close: +c[4], value: +c[5] || 0 });
+const drawable = (b) => Number.isFinite(b.time) && [b.open, b.high, b.low, b.close, b.value].every(Number.isFinite);
+const toBars = (list) => list.map(toBar).filter(drawable).reverse();
+const volBar = (b) => ({ time: b.time, value: b.value, color: b.close >= b.open ? 'rgba(46,189,133,.45)' : 'rgba(246,70,93,.45)' });
+
+/** Simple moving average of closes, skipping the first n-1 bars that have nothing to average. */
+function ma(bars, n) {
+  const out = [];
+  let sum = 0;
+  for (let i = 0; i < bars.length; i++) {
+    sum += bars[i].close;
+    if (i >= n) sum -= bars[i - n].close;
+    if (i >= n - 1 && Number.isFinite(sum)) out.push({ time: bars[i].time, value: sum / n });
+  }
+  return out;
+}
+const maAt = (bars, n, i) => {
+  if (i < n - 1) return null;
+  let sum = 0;
+  for (let k = i - n + 1; k <= i; k++) sum += bars[k].close;
+  return sum / n;
+};
 
 function legend(bar) {
   const b = bar || CH.data[CH.data.length - 1];
   const e = state.selected;
   if (!b || !e) { $('legend').innerHTML = ''; return; }
+  const i = CH.data.indexOf(b);
+  if (i < 0) return;
   const ch = b.open ? (b.close / b.open - 1) * 100 : 0;
   const c = ch >= 0 ? 'up' : 'down';
-  $('legend').innerHTML = `<b>${esc(e.symbol)}</b><span class="tfl">${$('tfs').querySelector('.on')?.textContent || ''}</span>` +
-    `<span>O <em class="${c}">${price(b.open)}</em></span><span>H <em class="${c}">${price(b.high)}</em></span>` +
-    `<span>L <em class="${c}">${price(b.low)}</em></span><span>C <em class="${c}">${price(b.close)}</em></span>` +
-    `<span class="${c}">${pct(ch)}</span><span>Vol <em>${usd(b.value)}</em></span>`;
+  const m7 = maAt(CH.data, 7, i), m25 = maAt(CH.data, 25, i);
+  $('legend').innerHTML =
+    `<span class="lg-id"><b>${esc(e.symbol)}</b><span class="tfl">${$('tfs').querySelector('.on')?.textContent || ''}</span></span>` +
+    `<span class="lg-ohlc">O <em class="${c}">${price(b.open)}</em> H <em class="${c}">${price(b.high)}</em> ` +
+    `L <em class="${c}">${price(b.low)}</em> C <em class="${c}">${price(b.close)}</em> <em class="${c}">${pct(ch)}</em></span>` +
+    (m7 ? `<span class="lg-ma ma7">MA7 ${price(m7)}</span>` : '') +
+    (m25 ? `<span class="lg-ma ma25">MA25 ${price(m25)}</span>` : '') +
+    `<span class="lg-vol">Vol ${usd(b.value)}</span>`;
 }
 
 async function candles(pool, token, tf, agg) {
@@ -330,7 +366,7 @@ async function loadCandles(e) {
   const wrap = $('chartWrap');
   clearInterval(CH.timer);
   CH.data = [];
-  CH.candle?.setData([]); CH.vol?.setData([]);
+  CH.candle?.setData([]); CH.vol?.setData([]); CH.ma7?.setData([]); CH.ma25?.setData([]);
   legend(null);
   wrap.classList.remove('empty');
   if (!e.pool) { $('chartEmpty').textContent = 'no pool for this token'; wrap.classList.add('empty'); return; }
@@ -342,14 +378,24 @@ async function loadCandles(e) {
   const list = await candles(e.pool, e.address, tf, agg);
   if (CH.key !== key) return;   // user moved on
   wrap.classList.remove('loading');
-  if (!list?.length) { $('chartEmpty').textContent = list ? 'no candles for this pool right now' : 'candles are rate limited, retrying'; wrap.classList.add('empty'); }
+  const bars = list ? toBars(list) : null;
+  if (!bars?.length) {
+    $('chartEmpty').textContent = list ? 'no candles for this pool right now' : 'candles are rate limited, retrying';
+    wrap.classList.add('empty');
+    // An empty first load should not leave a dead panel: try again shortly.
+    if (!list) setTimeout(() => { if (CH.key === key && !CH.data.length) loadCandles(e); }, 8000);
+  }
   else {
-    CH.data = list.map(toBar).reverse();
+    CH.data = bars;
     const p = precisionFor(CH.data[CH.data.length - 1].close);
     CH.candle.applyOptions({ priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } });
     CH.candle.setData(CH.data);
     CH.vol.setData(CH.data.map(volBar));
-    CH.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, CH.data.length - 120), to: CH.data.length + 4 });
+    CH.ma7.setData(ma(CH.data, 7));
+    CH.ma25.setData(ma(CH.data, 25));
+    // Show the recent stretch at a readable width rather than squeezing 300 bars in.
+    const span = Math.min(CH.data.length, 90);
+    CH.chart.timeScale().setVisibleLogicalRange({ from: CH.data.length - span, to: CH.data.length + 6 });
     legend(null);
   }
   // live: pull the latest bars again; the proxy caches 45 s, so faster polling buys nothing
@@ -362,14 +408,23 @@ async function tick(e, key) {
   const { tf, agg } = state.tf;
   const list = await candles(e.pool, e.address, tf, agg);
   if (CH.key !== key || !list?.length) return;
-  const bars = list.map(toBar).reverse();
+  const bars = toBars(list);
+  if (!bars.length) return;
   if (!CH.data.length) { loadCandles(e); return; }
   const last = CH.data[CH.data.length - 1].time;
+  let touched = false;
   for (const b of bars) {
     if (b.time < last) continue;
     CH.candle.update(b);
     CH.vol.update(volBar(b));
     if (b.time === CH.data[CH.data.length - 1].time) CH.data[CH.data.length - 1] = b; else CH.data.push(b);
+    touched = true;
+  }
+  if (touched) {
+    const i = CH.data.length - 1;
+    const m7 = maAt(CH.data, 7, i), m25 = maAt(CH.data, 25, i);
+    if (Number.isFinite(m7)) CH.ma7.update({ time: CH.data[i].time, value: m7 });
+    if (Number.isFinite(m25)) CH.ma25.update({ time: CH.data[i].time, value: m25 });
   }
   legend(null);
   // the last trade is the freshest price there is

@@ -1,12 +1,21 @@
 name: hourly snapshot
 
+# GitHub delays and drops `schedule` on quiet repositories: asking for every hour produced two or
+# three runs a day. So the job does not rely on the scheduler for each snapshot. It takes one, waits
+# an hour, takes another, for five and a half hours, then hands over to a fresh run of itself. The
+# cron below is only a safety net: if a chain ever dies, the next tick starts a new one.
+#
+# Minutes are free on public repositories, and the concurrency group keeps two chains from
+# overlapping: a second run waits rather than doubling up.
+
 on:
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '9 */6 * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write            # needed to hand over to the next run
 
 concurrency:
   group: snapshot
@@ -15,17 +24,40 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: node scripts/snapshot.mjs
-      - name: commit
+
+      - name: identity
         run: |
           git config user.name "Strak"
           git config user.email "180978138+usestrak@users.noreply.github.com"
-          git add history
-          git diff --cached --quiet || git commit -m "snapshot $(date -u +'%Y-%m-%d %H:%M') UTC"
-          git push
+
+      - name: snapshot every hour for one shift
+        run: |
+          for i in $(seq 1 6); do
+            echo "::group::snapshot $i of 6"
+            node scripts/snapshot.mjs || echo "this one failed, carrying on"
+            git pull --rebase --quiet origin main || true
+            git add history
+            if git diff --cached --quiet; then
+              echo "nothing changed"
+            else
+              git commit -q -m "snapshot $(date -u +'%Y-%m-%d %H:%M') UTC"
+              git push --quiet || { git pull --rebase --quiet origin main && git push --quiet; }
+            fi
+            echo "::endgroup::"
+            if [ "$i" -lt 6 ]; then sleep 3300; fi
+          done
+
+      - name: hand over to the next shift
+        if: always()
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/snapshot.yml/dispatches" \
+            -d '{"ref":"main"}'

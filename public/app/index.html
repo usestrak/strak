@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Strak terminal · Tokenized stocks on Solana</title>
 <meta name="description" content="Every tokenized stock on Solana with the turnover that says whether the volume is real.">
-<link rel="icon" href="/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B0B10">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Strak">
@@ -87,6 +89,12 @@
         <span id="verdictWord">·</span>
         <em id="verdictWhy"></em>
       </div>
+    </div>
+
+    <!-- the verdict, over time -->
+    <div class="history" id="history" hidden>
+      <div class="hist-head"><span class="hist-title">Turnover over time</span><span class="hist-sum" id="histSum"></span></div>
+      <div id="histBody"></div>
     </div>
 
     <div class="chart-wrap" id="chartWrap">

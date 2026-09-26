@@ -194,6 +194,7 @@ function select(e, opts = {}) {
   paintDetail(e);
   loadCandles(e);
   loadWho(e);
+  loadHistory(e);
   if (!opts.silent) history.replaceState(null, '', '#' + e.symbol);
 }
 
@@ -267,6 +268,102 @@ function paintCompare(e) {
       `<span class="r">$${price(x.price)}</span>${mid}` +
       `<span class="r"><b class="turn ${band(t) || ''}">${t == null ? '·' : t.toFixed(1) + 'x'}</b></span></button>`;
   }).join('') + (pre ? '<p class="compare-note">Each issuer sets its own share fraction, so these prices are not directly comparable.</p>' : '');
+}
+
+
+/* ── turnover over time ─────────────────────────
+   The verdict strip says what the pool looks like now. This says whether it has looked like that
+   all day. Points come from the hourly snapshot committed to the repository, so the line is as
+   dense as the scheduler managed, and the panel says plainly how many readings stand behind it. */
+const HIST = { cache: new Map(), key: '' };
+
+function histPath(points, w, h, pad, scale) {
+  const n = points.length;
+  const x = (i) => (n === 1 ? w / 2 : pad + (i / (n - 1)) * (w - pad * 2));
+  const y = (v) => h - pad - scale(v) * (h - pad * 2);
+  const pts = points.map((p, i) => [x(i), y(p.turn)]);
+  if (pts.length < 3) return { line: pts.map(([a, b], i) => (i ? 'L' : 'M') + a.toFixed(1) + ' ' + b.toFixed(1)).join(''), pts, x, y };
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += `C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return { line: d, pts, x, y };
+}
+
+function drawHistory(j) {
+  const box = $('histBody');
+  const pts = j.points || [];
+  if (pts.length < 2) {
+    box.innerHTML = `<p class="hist-empty">${pts.length ? 'only one reading so far' : 'no history for this one yet'}. The board is snapshotted a few times an hour and the record starts 25.09.2026.</p>`;
+    return;
+  }
+  const W = 560, H = 132, PAD = 10;
+  const top = Math.max(j.stats.peak * 1.18, 15);
+  const scale = (v) => Math.max(0, Math.min(1, v / top));
+  const { line, pts: xy, x, y } = histPath(pts, W, H, PAD, scale);
+  const b = band(j.stats.last);
+  const col = b === 'printed' ? '#3CFFAA' : b === 'hot' ? '#C9A6FF' : 'rgba(225,215,255,.6)';
+
+  // the two thresholds, drawn only where they fall inside the view
+  const rule = (v, label, c) => {
+    if (v > top) return '';
+    const yy = y(v).toFixed(1);
+    return `<line x1="${PAD}" y1="${yy}" x2="${W - PAD}" y2="${yy}" stroke="${c}" stroke-width="1" stroke-dasharray="3 4" opacity=".55"/>` +
+           `<text x="${W - PAD}" y="${(+yy - 4).toFixed(1)}" text-anchor="end" class="hist-rule">${label}</text>`;
+  };
+
+  const dots = xy.map(([px, py], i) =>
+    `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${i === xy.length - 1 ? 3.4 : 2.2}" fill="${col}">` +
+    `<title>${new Date(pts[i].t).toLocaleString()} · ${pts[i].turn}x · ${usd(pts[i].vol)} on ${usd(pts[i].liq)}</title></circle>`).join('');
+
+  const when = (t) => new Date(t).toLocaleString(undefined, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  box.innerHTML =
+    `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Turnover over time">` +
+    `<defs><linearGradient id="histFill" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0" stop-color="${col}" stop-opacity=".26"/><stop offset="1" stop-color="${col}" stop-opacity="0"/>` +
+    `</linearGradient></defs>` +
+    rule(50, '50x', '#3CFFAA') + rule(12, '12x', '#C9A6FF') +
+    `<path d="${line}L${xy[xy.length - 1][0].toFixed(1)} ${H - PAD}L${xy[0][0].toFixed(1)} ${H - PAD}Z" fill="url(#histFill)"/>` +
+    `<path d="${line}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>` +
+    dots + '</svg>' +
+    `<div class="hist-axis"><span>${when(j.stats.from)}</span><span>${when(j.stats.to)}</span></div>`;
+}
+
+function historySummary(st) {
+  const hours = (st.to - st.from) / 3600e3;
+  const bits = [`${st.readings} readings over ${hours < 48 ? hours.toFixed(1) + ' h' : (hours / 24).toFixed(1) + ' days'}`];
+  bits.push(`peak ${st.peak.toFixed(1)}x`);
+  // Readings, not hours: the scheduler leaves gaps, and a reading cannot speak for the hours
+  // around it. `coveredHours` and `hotHours` are in the API for anyone who wants to weight them.
+  if (st.abovePrinted) bits.push(`above 50x in ${st.abovePrinted} of ${st.readings}`);
+  else if (st.aboveHot === st.readings) bits.push('above 12x throughout');
+  else if (st.aboveHot) bits.push(`above 12x in ${st.aboveHot} of ${st.readings}`);
+  else bits.push('never above 12x');
+  return bits.join(' · ');
+}
+
+async function loadHistory(e) {
+  const box = $('history');
+  const key = e.symbol;
+  HIST.key = key;
+  box.hidden = false;
+  $('histSum').textContent = 'reading the record…';
+  $('histBody').innerHTML = '';
+  let j = HIST.cache.get(key);
+  if (!j) {
+    try {
+      const r = await fetch(`/api/history?symbol=${encodeURIComponent(key)}&days=7`);
+      j = r.ok ? await r.json() : null;
+    } catch { j = null; }
+    if (j) HIST.cache.set(key, j);
+  }
+  if (HIST.key !== key) return;
+  if (!j) { $('histSum').textContent = 'the record is unavailable right now'; return; }
+  $('histSum').textContent = j.stats ? historySummary(j.stats) : 'nothing recorded yet';
+  drawHistory(j);
 }
 
 /* ── chart: TradingView Lightweight Charts, updated live ─────────────

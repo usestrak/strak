@@ -60,7 +60,7 @@ async function live() {
   }
   const withPool = L.find((e) => e.pool);
   if (withPool) {
-    $('candlesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/candles?pool=${withPool.pool}&token=${withPool.address}&tf=hour&agg=4&limit=100"`;
+    $('candlesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/candles?mint=${withPool.address}&interval=1_HOUR&candles=100"`;
     const busiest = top || withPool;
     if (busiest.pool) $('tradesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/trades?pool=${busiest.pool}" | jq .stats`;
   }

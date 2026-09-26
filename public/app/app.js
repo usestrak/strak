@@ -30,7 +30,8 @@ const state = {
   sort: 'turn',
   onlySuspect: false,
   q: '',
-  tf: { tf: 'minute', agg: 15 },
+  iv: '15_MINUTE',   // chart interval, as Jupiter names it
+  ctype: 'price',    // price or market cap
 };
 
 /* ── format ─────────────────────────────────────── */
@@ -470,6 +471,7 @@ function initChart() {
   CH.draw = new Drawings();
   CH.candle.attachPrimitive(CH.draw);
   CH.chart.subscribeCrosshairMove(onCrosshair);
+  CH.chart.timeScale().subscribeVisibleLogicalRangeChange(moreHistory);
   // Drawing clicks are read from the DOM, not from the library: it holds a second click back while
   // it waits to see whether it becomes a double click, and a quick second point would be lost.
   // A press that moved more than a few pixels was a pan, not a click.
@@ -489,11 +491,11 @@ function initChart() {
   chartControls();
 }
 
-// GeckoTerminal occasionally returns a row with a missing field; a NaN there throws inside the
+// A row can arrive with a missing field; a NaN there throws inside the
 // charting library and takes the whole chart down, so bad rows are dropped on the way in.
-const toBar = (c) => ({ time: c[0] + TZ, open: +c[1], high: +c[2], low: +c[3], close: +c[4], value: +c[5] || 0 });
+const toBar = (c) => ({ time: c.time + TZ, open: +c.open, high: +c.high, low: +c.low, close: +c.close, value: +c.volume || 0 });
 const drawable = (b) => Number.isFinite(b.time) && [b.open, b.high, b.low, b.close, b.value].every(Number.isFinite);
-// GeckoTerminal also repeats a bar now and then (two rows with one timestamp, seen on 1m), and the
+// A source can repeat a bar now and then (two rows with one timestamp), and the
 // library throws on anything but strictly rising times: keep the freshest row per time, then sort.
 const toBars = (list) => {
   const seen = new Map();
@@ -549,13 +551,13 @@ function legend(bar) {
   const tf = $('tfs').querySelector('.on')?.textContent || '';
   const mas = MAS.filter(([id]) => IND[id]).map(([id, n, color]) => {
     const v = maAt(CH.data, n, i);
-    return v ? `<span class="lg-ma" style="color:${color}">MA ${n} <em>${price(v)}</em></span>` : '';
+    return v ? `<span class="lg-ma" style="color:${color}">MA ${n} <em>${fmtV(v)}</em></span>` : '';
   }).join('');
   $('legend').innerHTML =
     `<div class="lg-row"><span class="lg-id"><b>${esc(e.symbol)}</b> · ${esc(tf)} · Strak</span>` +
-    `<span>O <em class="${c}">${price(b.open)}</em> H <em class="${c}">${price(b.high)}</em> ` +
-    `L <em class="${c}">${price(b.low)}</em> C <em class="${c}">${price(b.close)}</em> ` +
-    `<em class="${c}">${d >= 0 ? '+' : '-'}${price(Math.abs(d)) === '·' ? '0' : price(Math.abs(d))} (${pct(ch)})</em></span></div>` +
+    `<span>O <em class="${c}">${fmtV(b.open)}</em> H <em class="${c}">${fmtV(b.high)}</em> ` +
+    `L <em class="${c}">${fmtV(b.low)}</em> C <em class="${c}">${fmtV(b.close)}</em> ` +
+    `<em class="${c}">${d >= 0 ? '+' : '-'}${fmtV(Math.abs(d)) === '·' ? '0' : fmtV(Math.abs(d))} (${pct(ch)})</em></span></div>` +
     `<div class="lg-row">${IND.vol ? `<span>Volume <em class="${c}">${usd(b.value)}</em></span>` : ''}${mas}</div>`;
 }
 
@@ -632,7 +634,7 @@ function setScale(which) {
 }
 
 // ranges pick a timeframe that fits the span, the way the range bar on GMGN does
-const RANGE_TF = { 1: ['minute', 5], 7: ['hour', 1], 30: ['hour', 4], 180: ['day', 1] };
+const RANGE_IV = { 1: '5_MINUTE', 7: '15_MINUTE', 30: '1_HOUR', 180: '4_HOUR' };
 
 function chartControls() {
   $('ctools').addEventListener('click', (e) => {
@@ -665,13 +667,18 @@ function chartControls() {
     if (document.fullscreenElement) document.exitFullscreen?.(); else w.requestFullscreen?.();
   });
   $('cScale').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setScale(b.dataset.scale); });
+  $('cPm').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || b.dataset.type === state.ctype) return;
+    state.ctype = b.dataset.type;
+    [...$('cPm').querySelectorAll('button')].forEach((c) => c.classList.toggle('on', c === b));
+    if (state.selected) loadCandles(state.selected);
+  });
   $('ranges').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const days = +b.dataset.range;
-    const [tf, agg] = RANGE_TF[days];
     CH.range = days;
-    state.tf = { tf, agg };
-    [...$('tfs').children].forEach((c) => c.classList.toggle('on', c.dataset.tf === tf && +c.dataset.agg === agg));
+    state.iv = RANGE_IV[days];
+    [...$('tfs').children].forEach((c) => c.classList.toggle('on', c.dataset.iv === state.iv));
     [...$('ranges').children].forEach((c) => c.classList.toggle('on', c === b));
     if (state.selected) loadCandles(state.selected);
   });
@@ -682,70 +689,118 @@ function chartControls() {
   clock(); setInterval(clock, 1000);
 }
 
-async function candles(pool, token, tf, agg) {
+/* ── candles: Jupiter's chart data, the source jup.ag itself draws from ──
+   Token level (every pool of the token at once, the same scope as the registry's volume), each
+   candle already opening at the previous close, history back to the token's first trade, and CORS
+   open to this site, so every visitor spends their own limit instead of one shared server's.
+   /api/candles is the fallback: it asks Jupiter from the server and, failing that, GeckoTerminal. */
+const JUP = 'https://datapi.jup.ag/v2/charts/';
+const LIVE_MS = { '1_SECOND': 2000, '15_SECOND': 5000, '1_MINUTE': 10000, '5_MINUTE': 20000, '15_MINUTE': 30000, '1_HOUR': 60000, '4_HOUR': 60000, '1_DAY': 120000 };
+const CACHE = new Map();   // `${mint}:${interval}:${type}` → { bars, t }
+
+async function fetchCandles(e, iv, type, toMs, n, signal) {
+  const q = `interval=${iv}&to=${Math.floor(toMs)}&candles=${n}&type=${type}&quote=usd`;
   try {
-    const r = await fetch(`/api/candles?pool=${pool}&token=${token}&tf=${tf}&agg=${agg}&limit=300`);
-    if (!r.ok) return null;
-    const j = await r.json();
-    return j.ohlcv || [];
-  } catch { return null; }
+    const r = await fetch(`${JUP}${e.address}?${q}`, { signal });
+    if (r.ok) { const j = await r.json(); if (Array.isArray(j.candles)) return j.candles; }
+  } catch (err) { if (err.name === 'AbortError') throw err; }
+  const r = await fetch(`/api/candles?mint=${e.address}${e.pool ? `&pool=${e.pool}` : ''}&${q}`, { signal });
+  if (!r.ok) return null;
+  const j = await r.json();
+  return Array.isArray(j.candles) ? j.candles : null;
+}
+
+// how a value reads in the legend and on the scale: a price, or a market cap in $K/$M/$B
+const fmtV = (v) => (state.ctype === 'mcap' ? usd(v) : price(v));
+
+function showBars(bars, fresh) {
+  CH.data = bars;
+  const fmt = state.ctype === 'mcap'
+    ? { priceFormat: { type: 'custom', minMove: 0.01, formatter: (v) => usd(v).replace('$', '') } }
+    : (() => { const p = precisionFor(bars[bars.length - 1].close); return { priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } }; })();
+  CH.candle.applyOptions(fmt); CH.line.applyOptions(fmt);
+  setSeries();
+  const ts = CH.chart.timeScale();
+  if (CH.range) {
+    // a range button asked for a span of days: show exactly that much, or all there is
+    const last = bars[bars.length - 1].time;
+    ts.setVisibleRange({ from: Math.max(bars[0].time, last - CH.range * 86400), to: last });
+    CH.range = 0;
+  } else if (fresh) {
+    // the recent stretch at a readable width rather than hundreds of bars squeezed in
+    const span = Math.min(bars.length, $('chart').clientWidth < 600 ? 60 : 130);
+    ts.setVisibleLogicalRange({ from: bars.length - span, to: bars.length + 8 });
+  }
+  legend(null);
+}
+
+function clearSeries() {
+  CH.data = [];
+  CH.candle?.setData([]); CH.line?.setData([]); CH.vol?.setData([]);
+  for (const s of Object.values(CH.mas)) s.setData([]);
+  legend(null);
 }
 
 async function loadCandles(e) {
   initChart();
   const wrap = $('chartWrap');
   clearInterval(CH.timer);
-  CH.data = [];
+  CH.abort?.abort();
+  const ac = CH.abort = new AbortController();
   clearDrawings();
-  CH.candle?.setData([]); CH.line?.setData([]); CH.vol?.setData([]);
-  for (const s of Object.values(CH.mas)) s.setData([]);
-  legend(null);
-  wrap.classList.remove('empty');
-  if (!e.pool) { $('chartEmpty').textContent = 'no pool for this token'; wrap.classList.add('empty'); return; }
-  $('chartEmpty').textContent = 'loading candles';
-  wrap.classList.add('loading');
-  const { tf, agg } = state.tf;
-  const key = `${e.pool}:${tf}:${agg}`;
-  CH.key = key;
-  const list = await candles(e.pool, e.address, tf, agg);
-  if (CH.key !== key) return;   // user moved on
+  const iv = state.iv, type = state.ctype;
+  const key = `${e.address}:${iv}:${type}`;
+  CH.key = key; CH.more = false; CH.exhausted = false;
+  wrap.classList.remove('empty', 'loading');
+  // what this view looked like last time shows at once; fresh candles replace it below
+  const hit = CACHE.get(key);
+  if (hit?.bars.length) showBars(hit.bars, true);
+  else { clearSeries(); $('chartEmpty').textContent = 'loading candles'; wrap.classList.add('loading'); }
+  let list = null;
+  for (let attempt = 0; attempt < 3 && !list; attempt++) {
+    try { list = await fetchCandles(e, iv, type, Date.now(), CH.range ? 1000 : 600, ac.signal); }
+    catch (err) { if (err.name === 'AbortError') return; }
+    if (CH.key !== key) return;   // the viewer moved on
+    if (!list) await new Promise((r) => setTimeout(r, 900 * (attempt + 1)));
+  }
+  if (CH.key !== key) return;
   wrap.classList.remove('loading');
-  const bars = list ? toBars(list) : null;
-  if (!bars?.length) {
-    $('chartEmpty').textContent = list ? 'no candles for this pool right now' : 'candles are rate limited, retrying';
+  const bars = list ? toBars(list) : [];
+  if (bars.length) {
+    CACHE.set(key, { bars, t: Date.now() });
+    showBars(bars, !hit);
+  } else if (!hit) {
+    $('chartEmpty').textContent = list ? 'no trades in this window yet' : 'candles did not load, trying again';
     wrap.classList.add('empty');
-    // An empty first load should not leave a dead panel: try again shortly.
-    if (!list) setTimeout(() => { if (CH.key === key && !CH.data.length) loadCandles(e); }, 8000);
+    if (!list) setTimeout(() => { if (CH.key === key && !CH.data.length) loadCandles(e); }, 5000);
   }
-  else {
-    CH.data = bars;
-    const p = precisionFor(CH.data[CH.data.length - 1].close);
-    const fmt = { priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } };
-    CH.candle.applyOptions(fmt); CH.line.applyOptions(fmt);
-    setSeries();
-    const ts = CH.chart.timeScale();
-    if (CH.range) {
-      // a range button asked for a span of days: show exactly that much, or all there is
-      const last = CH.data[CH.data.length - 1].time;
-      const from = Math.max(CH.data[0].time, last - CH.range * 86400);
-      ts.setVisibleRange({ from, to: last });
-      CH.range = 0;
-    } else {
-      // Show the recent stretch at a readable width rather than squeezing 300 bars in.
-      const span = Math.min(CH.data.length, $('chart').clientWidth < 600 ? 50 : 110);
-      ts.setVisibleLogicalRange({ from: CH.data.length - span, to: CH.data.length + 8 });
-    }
-    legend(null);
-  }
-  // live: pull the latest bars again; the proxy caches 45 s, so faster polling buys nothing
-  const every = tf === 'minute' ? 20000 : 60000;
-  CH.timer = setInterval(() => tick(e, key), every);
+  CH.timer = setInterval(() => tick(e, key), LIVE_MS[iv] || 30000);
+}
+
+// scrolling to the left edge pulls the next 500 bars of history, back to the first trade
+async function moreHistory(r) {
+  if (!r || r.from > 25 || CH.more || CH.exhausted || !CH.data.length || !state.selected) return;
+  CH.more = true;
+  const key = CH.key, e = state.selected;
+  let older = null;
+  try { older = await fetchCandles(e, state.iv, state.ctype, (CH.data[0].time - TZ) * 1000 - 1, 500, CH.abort?.signal); } catch { /* aborted */ }
+  if (CH.key !== key) { CH.more = false; return; }
+  const bars = older ? toBars(older).filter((b) => b.time < CH.data[0].time) : [];
+  if (!bars.length) { CH.exhausted = true; CH.more = false; return; }
+  const ts = CH.chart.timeScale();
+  const cur = ts.getVisibleLogicalRange();
+  for (const t of CH.trends) { t.from.l += bars.length; t.to.l += bars.length; }
+  CH.data = [...bars, ...CH.data];
+  setSeries();
+  if (cur) ts.setVisibleLogicalRange({ from: cur.from + bars.length, to: cur.to + bars.length });
+  CACHE.set(key, { bars: CH.data, t: Date.now() });
+  CH.more = false;
 }
 
 async function tick(e, key) {
-  if (document.hidden || CH.key !== key) return;
-  const { tf, agg } = state.tf;
-  const list = await candles(e.pool, e.address, tf, agg);
+  if (document.hidden || CH.key !== key || CH.more) return;
+  let list = null;
+  try { list = await fetchCandles(e, state.iv, state.ctype, Date.now(), 3, CH.abort?.signal); } catch { return; }
   if (CH.key !== key || !list?.length) return;
   const bars = toBars(list);
   if (!bars.length) return;
@@ -767,8 +822,10 @@ async function tick(e, key) {
       if (Number.isFinite(v)) CH.mas[id].update({ time: CH.data[i].time, value: v });
     }
     paintLast();
+    CACHE.set(key, { bars: CH.data, t: Date.now() });
   }
   legend(null);
+  if (state.ctype !== 'price') return;
   // the last trade is the freshest price there is
   const lp = CH.data[CH.data.length - 1].close;
   const el = $('dPrice');
@@ -845,7 +902,7 @@ function wire() {
 
   $('tfs').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    state.tf = { tf: b.dataset.tf, agg: +b.dataset.agg };
+    state.iv = b.dataset.iv;
     [...$('tfs').children].forEach((c) => c.classList.toggle('on', c === b));
     CH.range = 0;
     [...$('ranges').children].forEach((c) => c.classList.remove('on'));

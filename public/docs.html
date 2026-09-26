@@ -141,7 +141,7 @@
     <thead><tr><th>Block</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td>Verdict bar</td><td>Turnover on a log scale from 0.1x to 200x, with marks at 12x and 50x, the band name and a one-line reading.</td></tr>
-      <tr><td>Chart</td><td>Candles for the stock's deepest pool at 1m, 5m, 15m, 1H, 4H or 1D, with volume along the bottom. Indicators switch MA 7, MA 25, MA 99 and volume on and off. The rail on the left draws trend lines and horizontal price lines; the bin removes them. Below the chart, 1d, 7d, 30d and 180d pick a span and a timeframe that fits it, and %, log and auto change the price scale. The camera saves the chart as an image. New candles arrive every 20 to 60 seconds while the chart is open.</td></tr>
+      <tr><td>Chart</td><td>Candles for the whole token, every pool at once, from 1 second to 1 day (1s, 15s, 1m, 5m, 15m, 1H, 4H, 1D), in price or in market cap, with volume along the bottom. Scrolling to the left edge loads older candles, back to the first trade. Indicators switch MA 7, MA 25, MA 99 and volume on and off. The rail on the left draws trend lines and horizontal price lines; the bin removes them. Below the chart, 1d, 7d, 30d and 180d pick a span and a timeframe that fits it, and %, log and auto change the price scale. The camera saves the chart as an image. New candles arrive every 2 seconds on 1s and up to every 2 minutes on 1D while the chart is open.</td></tr>
       <tr><td>Volume 24h</td><td>Buy plus sell volume across the token's pools, in USD.</td></tr>
       <tr><td>Pool liquidity</td><td>USD liquidity behind the token.</td></tr>
       <tr><td>Pool turns over every</td><td>1440 minutes divided by turnover: how often, at this pace, the whole depth changes hands.</td></tr>
@@ -327,7 +327,8 @@ preipo.length;     // pre-IPO, a separate universe</code></pre></div>
     <tbody>
       <tr><td>Jupiter verified token list</td><td>The universe, price, 24h buy and sell volume, 24h price change, liquidity, trade count, holders, organic score, icon</td><td>Registry rebuilt on request, cached 5 min</td></tr>
       <tr><td>DexScreener</td><td>The deepest pool per token, its DEX and quote asset, the pool's 24h, 6h and 1h price change</td><td>With the registry</td></tr>
-      <tr><td>GeckoTerminal</td><td>OHLCV candles for the terminal chart and the landing sparklines</td><td>Candles cached 45 s, sparklines 30 min</td></tr>
+      <tr><td>Jupiter charts</td><td>Token-level OHLCV for the terminal chart, in price or market cap, 1 second to 1 week</td><td>Read by the browser directly; the fallback route caches 3 to 20 s</td></tr>
+      <tr><td>GeckoTerminal</td><td>Landing sparklines, swaps per pool, and the last resort for chart candles</td><td>Sparklines 30 min, swaps 20 s</td></tr>
     </tbody>
   </table>
   <h3 id="s-pipeline">The pipeline</h3>
@@ -338,7 +339,7 @@ preipo.length;     // pre-IPO, a separate universe</code></pre></div>
     <li>Compute turnover and sort by volume.</li>
   </ol>
   <p>A full build takes a few seconds. The CDN keeps each answer for five minutes, so one build serves every visitor in that window. If the upstreams fail, the site falls back to the static snapshot in <code>/data/equities.json</code>, and the terminal labels the board as a snapshot instead of live.</p>
-  <div class="note"><b>Volume and the chart are different scopes.</b> Turnover uses Jupiter's token-level volume and liquidity. The chart and the pool link point to the single deepest pool from DexScreener. For most stocks the deepest pool carries nearly all of the trading; where it doesn't, the numbers under the chart are still the token-level ones.</div>
+  <div class="note"><b>The chart and turnover share a scope; the swaps do not.</b> Turnover uses Jupiter's token-level volume and liquidity, and the chart is Jupiter's token-level candles, so both count every pool. The pool link and the swaps under the chart come from the single deepest pool from DexScreener, so a swap count there covers that pool only.</div>
 </section>
 
 <section id="fields">
@@ -422,25 +423,25 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
 <section id="api-candles">
   <p class="crumb">Developers</p>
   <h2><code>GET /api/candles</code></h2>
-  <p>A proxy for GeckoTerminal OHLCV on Solana. It exists because GeckoTerminal answers browsers with a 429 and no CORS headers, which a browser reports as a CORS failure.</p>
+  <p>The chart's fallback. The terminal reads Jupiter's chart API straight from the browser; when that fails, it asks here. This route asks Jupiter from the server and, if Jupiter is down too, GeckoTerminal for the token's deepest pool. The answer has the same shape either way.</p>
   <table class="fields">
     <thead><tr><th>Param</th><th>Default</th><th>Rules</th></tr></thead>
     <tbody>
-      <tr><td><code>pool</code></td><td>required</td><td>Pool address, base58, 32 to 44 characters.</td></tr>
-      <tr><td><code>token</code></td><td>none</td><td>Mint to price in. Pass the stock's <code>address</code> so candles are in the stock's price, not the quote asset's.</td></tr>
-      <tr><td><code>tf</code></td><td><code>hour</code></td><td><code>minute</code>, <code>hour</code> or <code>day</code>.</td></tr>
-      <tr><td><code>agg</code></td><td><code>1</code></td><td>Candles per bar, 1 to 30. <code>tf=minute&amp;agg=15</code> is 15 minute candles.</td></tr>
-      <tr><td><code>limit</code></td><td><code>200</code></td><td>Number of candles, 10 to 1000.</td></tr>
+      <tr><td><code>mint</code></td><td>required</td><td>The stock's <code>address</code>, base58, 32 to 44 characters.</td></tr>
+      <tr><td><code>interval</code></td><td><code>15_MINUTE</code></td><td><code>1_SECOND</code>, <code>15_SECOND</code>, <code>1_MINUTE</code>, <code>5_MINUTE</code>, <code>15_MINUTE</code>, <code>30_MINUTE</code>, <code>1_HOUR</code>, <code>4_HOUR</code>, <code>1_DAY</code> or <code>1_WEEK</code>.</td></tr>
+      <tr><td><code>type</code></td><td><code>price</code></td><td><code>price</code> or <code>mcap</code> (market cap).</td></tr>
+      <tr><td><code>candles</code></td><td><code>500</code></td><td>How many, 1 to 1000, ending at <code>to</code>.</td></tr>
+      <tr><td><code>to</code></td><td>now</td><td>Unix milliseconds. Pass the first candle's time minus one to page back through history.</td></tr>
+      <tr><td><code>pool</code></td><td>none</td><td>The stock's <code>pool</code>, used only if the route has to fall back to GeckoTerminal (1 minute and up, price only).</td></tr>
     </tbody>
   </table>
-  <div class="code"><div class="code-h"><span>curl</span><button class="copy">Copy</button></div><pre><code id="candlesCurl">curl -s "https://strak-six.vercel.app/api/candles?pool=&lt;pool&gt;&amp;token=&lt;mint&gt;&amp;tf=hour&amp;agg=4&amp;limit=100"</code></pre></div>
-  <p>Answer: <code>{"ohlcv": [[time, open, high, low, close, volume], …]}</code>, newest first, time in Unix seconds, prices and volume in USD.</p>
+  <div class="code"><div class="code-h"><span>curl</span><button class="copy">Copy</button></div><pre><code id="candlesCurl">curl -s "https://strak-six.vercel.app/api/candles?mint=&lt;mint&gt;&amp;interval=1_HOUR&amp;candles=100"</code></pre></div>
+  <p>Answer: <code>{"candles": [{"time", "open", "high", "low", "close", "volume"}, …], "source": "jupiter"}</code>, oldest first, time in Unix seconds, prices and volume in USD. <code>source</code> says which upstream answered.</p>
   <table class="compact">
     <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
     <tbody>
-      <tr><td><code>400</code></td><td><code>bad pool</code>, <code>bad token</code> or <code>bad timeframe</code>.</td></tr>
-      <tr><td><code>429</code></td><td>GeckoTerminal is rate limiting. Retry after a few seconds.</td></tr>
-      <tr><td><code>502</code></td><td>Upstream error or unreachable.</td></tr>
+      <tr><td><code>400</code></td><td><code>bad mint</code>, <code>bad pool</code> or <code>bad interval</code>.</td></tr>
+      <tr><td><code>502</code></td><td>No source answered. Retry after a few seconds.</td></tr>
     </tbody>
   </table>
 </section>
@@ -534,6 +535,7 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
   <p class="crumb">Reference</p>
   <h2>Changelog</h2>
   <div class="log">
+    <div><time>27.09.2026</time><p>Candles now come from Jupiter for the whole token, every pool at once, so every stock and pre-IPO token has a chart and the chart counts the same trades as turnover. Timeframes from 1 second to 1 day, price or market cap, older candles on scrolling left, faster switching with the last view kept in memory. A chart in the layout traders know: drawing rail, indicators, ranges and scale modes.</p></div>
     <div><time>26.09.2026</time><p>A <a href="#pre-ipo">Pre-IPO tab</a> for tokens tracking private companies, kept apart from the board. Swaps per pool: who makes the volume, on the landing and under every chart. Candles moved to a proper trading chart with 1m to 1D timeframes and moving averages. An hourly snapshot of the whole board, drawn as turnover over time under every chart. Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
     <div><time>25.09.2026</time><p>Strak goes live: the terminal, the landing and a live registry route that rebuilds the board every five minutes.</p></div>
     <div><time>23.09.2026</time><p>First registry run: 90 stocks from three issuers. IONQ at 152.4x becomes the first case file.</p></div>

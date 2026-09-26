@@ -86,7 +86,7 @@ function paintChips(list) {
     const style = `--x:${sl.x}%;--y:${sl.y}%;--d:${sl.d};--blur:${sl.blur || 0}px`;
     const cs = `--s:${sl.s};--r:${sl.r}deg;--t:${7 + (i % 4) * 1.3}s;--delay:${-i * 1.7}s`;
     return `<div class="slot${far}" style="${style}"><a class="chip${hot}" style="${cs}" href="${appLink(e)}" tabindex="-1">` +
-      `<i class="d ${e.issuer}"></i><b>${esc(e.symbol)}</b><em>${tx(e.turnover)}</em></a></div>`;
+      `<i class="d ${e.issuer}"></i><b>${esc(e.symbol)}</b><em>${odo('chip-' + e.address, tx(e.turnover))}</em></a></div>`;
   }).join('');
 }
 
@@ -266,19 +266,12 @@ function paintStats(reg) {
   const vol = L.reduce((a, e) => a + e.vol24, 0);
   const hot = L.filter((e) => e.turnover > 12).length;
   $('heroStats').innerHTML =
-    `<span><b>${L.length}</b> stocks</span><span><b>${usd(vol)}</b> volume 24h</span>` +
-    `<span class="hot"><b>${hot}</b> above 12x</span><span>updated ${ago(reg.updatedAt)}</span>`;
+    `<span><b>${odo('hs-n', L.length)}</b> stocks</span><span><b>${odo('hs-vol', usd(vol))}</b> volume 24h</span>` +
+    `<span class="hot"><b>${odo('hs-hot', hot)}</b> above 12x</span><span>updated ${ago(reg.updatedAt)}</span>`;
+  odoRun($('heroStats'));
 }
 
 /* ── the metric: bands, spread, cases ─────────────── */
-function paintBands(L) {
-  const c = { organic: 0, hot: 0, printed: 0 };
-  for (const e of L) c[band(e.turnover)]++;
-  document.querySelectorAll('[data-band]').forEach((el) => {
-    const n = c[el.dataset.band];
-    el.textContent = `${n} ${n === 1 ? 'stock' : 'stocks'} now`;
-  });
-}
 
 const LO = .1, HI = 200;
 const pos = (t) => (Math.log10(Math.min(Math.max(t, LO), HI)) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO));
@@ -383,9 +376,10 @@ function paintDash(reg) {
   const top3 = [...L].sort((a, b) => b.turnover - a.turnover).slice(0, 3);
   $('hotCards').innerHTML = top3.map((e) =>
     `<a class="hot-card" href="${appLink(e)}"><span class="hc-top">${icon(e)}<em>↗</em></span>` +
-    `<b>${esc(e.symbol)}<i class="idot ${e.issuer}"></i></b><span class="hc-x ${tcls(e.turnover)}">${tx(e.turnover)}</span>` +
+    `<b>${esc(e.symbol)}<i class="idot ${e.issuer}"></i></b><span class="hc-x ${tcls(e.turnover)}">${odo('hc-' + e.address, tx(e.turnover))}</span>` +
     `<span class="hc-sub">${usd(e.vol24)} volume on ${usd(e.liq)} liquidity. The pool turns over every ${every(e.turnover)}.</span>` +
     `<span class="hc-btn">Open chart</span></a>`).join('');
+  odoRun($('hotCards'));
   paintDashRows();
 }
 function paintDashRows() {
@@ -395,9 +389,10 @@ function paintDashRows() {
   $('dashRows').innerHTML = rows.map((e, i) =>
     `<a class="dt-row" href="${appLink(e)}"><span class="n">${i + 1}.</span>` +
     `<span class="st">${icon(e)}${esc(e.symbol)}</span><span class="nm hide-m">${esc(e.name)}</span>` +
-    `<span class="r ${flash(e, 'price')}">$${price(e.price)}</span><span class="r hide-s">${usd(e.vol24)}</span><span class="r hide-m">${usd(e.liq)}</span>` +
-    `<span class="r ${tcls(e.turnover)} ${flash(e, 'turnover')}">${tx(e.turnover)}</span>` +
+    `<span class="r ${flash(e, 'price')}">${odo('dp-' + e.address, '$' + price(e.price))}</span><span class="r hide-s">${usd(e.vol24)}</span><span class="r hide-m">${usd(e.liq)}</span>` +
+    `<span class="r ${tcls(e.turnover)} ${flash(e, 'turnover')}">${odo('dt-' + e.address, tx(e.turnover))}</span>` +
     `<span class="hide-s">${sparkSlot(e, 84, 26)}</span><span class="open">Open</span></a>`).join('');
+  odoRun($('dashRows'));
 }
 function wireDash() {
   $('dashTabs').addEventListener('click', (ev) => {
@@ -483,8 +478,8 @@ function paintPlans(L) {
     return `<article class="plan${featured ? ' feat-plan' : ''}" data-r>
       <div class="plan-top"><i class="idot ${k}"></i><h3>${ISS[k].short}</h3>${featured ? '<em>✦ Most listed</em>' : ''}</div>
       <p>${ISS_DESC[k]}</p>
-      <div class="plan-n">${list.length}<small>${list.length === 1 ? 'stock' : 'stocks'}</small></div>
-      <div class="plan-sub">${usd(vol)} volume in 24 hours</div>
+      <div class="plan-n">${odo('pl-' + k, list.length)}<small>${list.length === 1 ? 'stock' : 'stocks'}</small></div>
+      <div class="plan-sub">${odo('pv-' + k, usd(vol))} volume in 24 hours</div>
       <ul>
         <li>Liquidity<span>${usd(liq)}</span></li>
         <li>Most traded<span>${busiest ? esc(busiest.symbol) : '·'}</span></li>
@@ -495,6 +490,7 @@ function paintPlans(L) {
     </article>`;
   }).join('');
   document.querySelectorAll('#plans [data-r]').forEach((el, i) => el.style.setProperty('--d', (i * .08).toFixed(2) + 's'));
+  odoRun($('plans'));
 }
 
 /* ── nav ──────────────────────────────────────────── */
@@ -516,8 +512,11 @@ function flash(e, k) {
 function remember(L) { for (const e of L) PREV.set(e.address, { price: e.price, turnover: e.turnover, vol24: e.vol24 }); }
 
 function flashText(el, text, dir) {
-  if (!el || el.textContent === text) return;
-  el.textContent = text;
+  if (!el) return;
+  const key = el.id || el.dataset.odo || (el.dataset.odo = 'k' + (++ODO_N));
+  if (ODO_PREV.get(key) === text) return;
+  el.innerHTML = odo(key, text);
+  odoRun(el);
   el.classList.remove('flash-up', 'flash-down');
   void el.offsetWidth;
   if (dir) el.classList.add(dir > 0 ? 'flash-up' : 'flash-down');
@@ -529,8 +528,10 @@ function updateChips(L) {
   document.querySelectorAll('#chips .chip').forEach((c) => {
     const e = by.get(c.querySelector('b')?.textContent);
     if (!e) return;
-    const p = PREV.get(e.address);
-    flashText(c.querySelector('em'), tx(e.turnover), p ? Math.sign(e.turnover - p.turnover) : 0);
+    const em = c.querySelector('em');
+    if (ODO_PREV.get('chip-' + e.address) === tx(e.turnover)) return;
+    em.innerHTML = odo('chip-' + e.address, tx(e.turnover));
+    odoRun(em);
   });
 }
 
@@ -637,8 +638,176 @@ function wireWv() {
   setInterval(() => { if (visible) document.querySelectorAll('#wvRows .tm').forEach((el) => { el.textContent = since(+el.dataset.t); }); }, 1000);
 }
 
+/* ── odometer numbers ────────────────────────────────
+   A changed number does not blink into place, it rolls there, digit by digit, like a departures
+   board. Markup is rendered at the previous value and rolled to the new one on the next frame,
+   so it survives the full re-renders the dashboard does every minute. Keyed by what the number
+   is (a stock's turnover, a stat), not by which element holds it. */
+const ODO_PREV = new Map();
+let ODO_N = 0;
+const isDigit = (ch) => ch >= '0' && ch <= '9';
+
+function odo(key, text) {
+  text = String(text);
+  const prev = ODO_PREV.get(key);
+  ODO_PREV.set(key, text);
+  const from = prev ?? text;
+  const n = Math.max(from.length, text.length);
+  const a = from.padStart(n, ' '), b = text.padStart(n, ' ');
+  let html = `<span class="odo" aria-label="${esc(text)}">`;
+  for (let i = 0; i < n; i++) {
+    const to = b[i];
+    if (to === ' ') continue;
+    if (isDigit(to)) {
+      const start = isDigit(a[i]) ? a[i] : to;
+      html += `<span class="od" aria-hidden="true"><span class="os" style="transform:translateY(-${start}0%)"` +
+        (start !== to ? ` data-to="${to}"` : '') + `>` +
+        '0123456789'.split('').map((d) => `<span>${d}</span>`).join('') + '</span></span>';
+    } else {
+      html += `<span class="oc" aria-hidden="true">${esc(to)}</span>`;
+    }
+  }
+  return html + '</span>';
+}
+// Roll whatever odo() rendered at its old value. Two frames, so the start position is painted first.
+function odoRun(root = document) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    root.querySelectorAll('.os[data-to]').forEach((s) => {
+      s.style.transform = `translateY(-${s.dataset.to}0%)`;
+      s.removeAttribute('data-to');
+    });
+  }));
+}
+
+/* ── the case, told by scrolling ─────────────────────
+   One pool with $107K in it, and $16.5M of volume going through it in a day. The section pins
+   while you scroll past it and the numbers climb with your position: nothing hijacks the wheel,
+   the page scrolls natively and the script only reads where the section is. Every figure comes
+   from /data/cases.json, which carries the date of the run it was taken from. */
+function story(cases) {
+  const sec = $('case');
+  const c = cases?.cases?.[0];
+  if (!sec || !c) { if (sec) sec.hidden = true; return; }
+  const f = c.followUp;
+  const set = (k, v) => sec.querySelectorAll(`[data-s="${k}"]`).forEach((el) => { el.textContent = v; });
+  set('date', c.date.split('-').reverse().join('.'));
+  set('symbol', c.symbol);
+  set('issuer', ISS[c.issuer]?.name || c.issuer);
+  set('liq', usd(c.liq));
+  set('vol', usd(c.vol24));
+  set('every', every(c.turnover));
+  if (f) {
+    set('after', tx(f.turnover));
+    set('less', Math.round(c.vol24 / f.vol24) + 'x less');
+  } else {
+    sec.querySelector('[data-at=".82"]')?.remove();
+  }
+  $('stLiq').innerHTML = odo('st-liq', usd(c.liq));
+
+  // one square per full turn of the pool, so the grid itself is the number
+  const cells = Math.max(160, Math.ceil(c.turnover / 16) * 16);
+  const grid = $('sg');
+  grid.innerHTML = Array.from({ length: cells }, () => '<i></i>').join('');
+  const sq = [...grid.children];
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let lit = -1, last = '';
+  function paint(p) {
+    // volume accumulates, so the climb starts slow and speeds up, then holds at the end
+    const k = Math.min(1, Math.max(0, p / .78));
+    const e = k * k * (3 - 2 * k);
+    const t = c.turnover * e;
+    const b = band(t);
+    const txt = tx(t);
+    if (txt !== last) {
+      last = txt;
+      $('stVol').textContent = usd(c.vol24 * e);
+      $('stTurn').textContent = txt;
+      $('stTurn').className = b;
+      $('stBand').textContent = BAND_WORD[b];
+      $('stBand').className = b;
+    }
+    const n = Math.floor(t);
+    if (n !== lit) {
+      lit = n;
+      for (let i = 0; i < sq.length; i++) {
+        // g1..g3, not b1..b3: those names belong to the background lights
+        const want = i < n ? (i < 12 ? 'on g1' : i < 50 ? 'on g2' : 'on g3') : '';
+        if (sq[i].className !== want) sq[i].className = want;
+      }
+    }
+    sec.querySelectorAll('.sl').forEach((l) => l.classList.toggle('on', p >= +l.dataset.at));
+    sec.classList.toggle('done', p >= .8);
+  }
+
+  if (reduce) { sec.classList.add('still'); paint(1); return; }
+
+  let raf = 0, active = false;
+  const read = () => {
+    raf = 0;
+    const r = sec.getBoundingClientRect();
+    const run = sec.offsetHeight - innerHeight;
+    paint(run > 0 ? Math.min(1, Math.max(0, -r.top / run)) : 1);
+  };
+  const onScroll = () => { if (active && !raf) raf = requestAnimationFrame(read); };
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll, { passive: true });
+  new IntersectionObserver(([en]) => { active = en.isIntersecting; if (active) onScroll(); }).observe(sec);
+  paint(0);
+}
+
+/* ── the light follows the reading ───────────────────
+   Violet at the top of the page, green by the bottom: the same drift as the dots on the banner,
+   volume flowing from left to right. Only opacity changes, on layers that already exist. */
+function colorShift() {
+  const bg = $('bg');
+  if (!bg) return;
+  let raf = 0;
+  const run = () => {
+    raf = 0;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    bg.style.setProperty('--sp', (max > 0 ? Math.min(1, scrollY / max) : 0).toFixed(3));
+  };
+  addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(run); }, { passive: true });
+  addEventListener('resize', run, { passive: true });
+  run();
+}
+
+/* ── the bands, with the stocks actually in them ─────── */
+function bchip(e, cls = '') {
+  return `<a class="bchip ${cls}" href="${appLink(e)}"><i class="idot ${e.issuer}"></i><b>${esc(e.symbol)}</b>` +
+    `<em>${odo('bc-' + e.address, tx(e.turnover))}</em></a>`;
+}
+function paintBands(L, cases) {
+  const by = { organic: [], hot: [], printed: [] };
+  for (const e of L) by[band(e.turnover)].push(e);
+  for (const k of Object.keys(by)) by[k].sort((a, b) => b.turnover - a.turnover);
+
+  document.querySelectorAll('[data-band]').forEach((el) => {
+    const n = by[el.dataset.band].length;
+    el.innerHTML = n ? `${odo('band-' + el.dataset.band, String(n))} ${n === 1 ? 'stock' : 'stocks'} now` : 'none right now';
+  });
+
+  const box = (k) => document.querySelector(`[data-bchips="${k}"]`);
+  // normal trading holds most of the board, so show the edge of it and count the rest
+  const org = by.organic.slice(0, 6);
+  box('organic').innerHTML = org.map((e) => bchip(e)).join('') +
+    (by.organic.length > org.length ? `<a class="bchip more" href="/app">+${by.organic.length - org.length} more</a>` : '');
+  box('hot').innerHTML = by.hot.length ? by.hot.slice(0, 8).map((e) => bchip(e, 'hot')).join('') : '<span class="bnone">Quiet: nothing in this band right now.</span>';
+
+  const c = (cases || window.__cases)?.cases?.[0];
+  box('printed').innerHTML = by.printed.length
+    ? by.printed.map((e) => bchip(e, 'printed')).join('')
+    : (c ? `<span class="bnone">Last seen:</span>` +
+          `<a class="bchip printed past" href="#case"><i class="idot ${c.issuer}"></i><b>${esc(c.symbol)}</b><em>${tx(c.turnover)}</em>` +
+          `<small>${c.date.split('-').reverse().join('.')}</small></a>`
+        : '<span class="bnone">Nothing this high right now.</span>');
+  odoRun($('bands'));
+}
+
 async function main() {
   nav();
+  colorShift();
   cursor();
   flow();
   parallax();
@@ -659,8 +828,10 @@ async function main() {
   paintGauge(L);
   paintTiles(L);
   paintPairs(L);
-  paintBands(L);
+  window.__cases = cases;
+  paintBands(L, cases);
   paintPromo(cases);
+  story(cases);
   paintPlans(L);
   reveal();   // the plan cards were just created
   REG = reg;

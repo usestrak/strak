@@ -94,7 +94,7 @@
               <h3>Is the volume real</h3>
               <div class="hot-cards" id="hotCards"></div>
             </div>
-            <a class="dash-promo" id="dashPromo" href="/docs#case-files">
+            <a class="dash-promo" id="dashPromo" href="#case">
               <span class="promo-top"><span class="promo-brand"><img src="/brand/mark-64.webp" alt="" width="12" height="13">Strak</span><em>Case file</em></span>
               <b>IONQ printed <span id="promoX">152.4x</span></b>
               <span class="promo-sub" id="promoSub">A dated snapshot from the registry</span>
@@ -224,12 +224,41 @@
   </div>
 </section>
 
+<!-- ── the case, told by scrolling ─────────────────────────── -->
+<section class="story" id="case" aria-label="Case file">
+  <div class="story-stage">
+    <div class="col story-in">
+      <div class="story-text">
+        <p class="eyebrow">Case file <i>·</i> <span data-s="date">·</span></p>
+        <h2><span data-s="symbol">·</span>, <span data-s="issuer">·</span></h2>
+        <div class="story-lines">
+          <p class="sl" data-at="0">One pool, with <b data-s="liq">·</b> of liquidity in it.</p>
+          <p class="sl" data-at=".2">In a single day, <b data-s="vol">·</b> of volume went through it.</p>
+          <p class="sl" data-at=".5">That is the whole pool changing hands every <b data-s="every">·</b>, around the clock.</p>
+          <p class="sl" data-at=".82">Two days later it read <b data-s="after">·</b>. Same depth, <b data-s="less">·</b> volume.</p>
+        </div>
+        <div class="story-nums">
+          <div><i>Liquidity</i><b id="stLiq">·</b></div>
+          <div><i>Volume 24h</i><b id="stVol">$0</b></div>
+          <div class="st-turn"><i>Turnover</i><b id="stTurn">0.0x</b><em id="stBand">normal trading</em></div>
+        </div>
+      </div>
+      <div class="story-grid">
+        <span class="stamp">Volume is painted</span>
+        <p class="sg-cap">Each square is the whole pool changing hands once</p>
+        <div class="sg" id="sg"></div>
+        <div class="sg-legend"><span><i class="l1"></i>up to 12x</span><span><i class="l2"></i>12x to 50x</span><span><i class="l3"></i>above 50x</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── the three bands, as numbered steps ───────────────────── -->
 <section class="sec" id="bands">
   <div class="col">
     <div class="sec-head center">
       <h2 class="split">Three bands, one verdict</h2>
-      <p class="sub" data-r>Every stock on the board falls into one of three bands. The count under each band is the registry right now.</p>
+      <p class="sub" data-r>Every stock on the board falls into one of three bands. These are the stocks in each, right now.</p>
     </div>
     <div class="steps">
       <article class="step" data-r>
@@ -237,18 +266,21 @@
         <h3>Up to 12x</h3>
         <p>Normal trading. Volume fits what the pool can carry.</p>
         <em data-band="organic">·</em>
+        <div class="bchips" data-bchips="organic"></div>
       </article>
       <article class="step" data-r>
         <span class="num"><b>2</b></span>
         <h3>12x to 50x</h3>
         <p>Suspiciously hot. It can be news, it can be a loop.</p>
         <em data-band="hot">·</em>
+        <div class="bchips" data-bchips="hot"></div>
       </article>
       <article class="step printed" data-r>
         <span class="num"><b>3</b></span>
         <h3>Above 50x</h3>
         <p>Volume is painted. Don't trust the price.</p>
         <em data-band="printed">·</em>
+        <div class="bchips" data-bchips="printed"></div>
       </article>
     </div>
 

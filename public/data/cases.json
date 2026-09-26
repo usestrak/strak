@@ -8,7 +8,13 @@
    "issuer": "backpack",
    "turnover": 152.4,
    "vol24": 16500000,
-   "liq": 107000
+   "liq": 107000,
+   "followUp": {
+    "date": "2026-09-25",
+    "turnover": 3.72,
+    "vol24": 413000,
+    "liq": 111000
+   }
   }
  ]
 }

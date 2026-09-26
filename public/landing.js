@@ -655,9 +655,11 @@ function odo(key, text) {
   const n = Math.max(from.length, text.length);
   const a = from.padStart(n, ' '), b = text.padStart(n, ' ');
   let html = `<span class="odo" aria-label="${esc(text)}">`;
+  const pad = n - text.length;          // only the left padding is skipped, spaces inside the text stay
   for (let i = 0; i < n; i++) {
     const to = b[i];
-    if (to === ' ') continue;
+    if (i < pad) continue;
+    if (to === ' ') { html += '<span class="oc sp" aria-hidden="true">&nbsp;</span>'; continue; }
     if (isDigit(to)) {
       const start = isDigit(a[i]) ? a[i] : to;
       html += `<span class="od" aria-hidden="true"><span class="os" style="transform:translateY(-${start}0%)"` +
@@ -756,23 +758,6 @@ function story(cases) {
   paint(0);
 }
 
-/* ── the light follows the reading ───────────────────
-   Violet at the top of the page, green by the bottom: the same drift as the dots on the banner,
-   volume flowing from left to right. Only opacity changes, on layers that already exist. */
-function colorShift() {
-  const bg = $('bg');
-  if (!bg) return;
-  let raf = 0;
-  const run = () => {
-    raf = 0;
-    const max = document.documentElement.scrollHeight - innerHeight;
-    bg.style.setProperty('--sp', (max > 0 ? Math.min(1, scrollY / max) : 0).toFixed(3));
-  };
-  addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(run); }, { passive: true });
-  addEventListener('resize', run, { passive: true });
-  run();
-}
-
 /* ── the bands, with the stocks actually in them ─────── */
 function bchip(e, cls = '') {
   return `<a class="bchip ${cls}" href="${appLink(e)}"><i class="idot ${e.issuer}"></i><b>${esc(e.symbol)}</b>` +
@@ -807,7 +792,6 @@ function paintBands(L, cases) {
 
 async function main() {
   nav();
-  colorShift();
   cursor();
   flow();
   parallax();

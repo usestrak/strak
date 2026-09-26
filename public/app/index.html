@@ -101,21 +101,65 @@
       <div id="histBody"></div>
     </div>
 
+    <!-- the chart, laid out the way trading terminals do it: timeframes and tools on top, drawing
+         tools on the left, ranges and scale modes at the bottom. Every control works. -->
     <div class="chart-wrap" id="chartWrap">
-      <div class="chart-bar">
+      <div class="cbar">
         <div class="tfs" id="tfs">
           <button data-tf="minute" data-agg="1">1m</button>
           <button data-tf="minute" data-agg="5">5m</button>
           <button data-tf="minute" data-agg="15" class="on">15m</button>
-          <button data-tf="hour" data-agg="1">1h</button>
-          <button data-tf="hour" data-agg="4">4h</button>
+          <button data-tf="hour" data-agg="1">1H</button>
+          <button data-tf="hour" data-agg="4">4H</button>
           <button data-tf="day" data-agg="1">1D</button>
         </div>
+        <i class="csep"></i>
+        <button class="cbtn" id="cType" type="button" title="Candles or line" aria-label="Chart type">
+          <svg viewBox="0 0 20 20" class="ico-candles"><path d="M6 3v3M6 14v3M14 2v4M14 12v6"/><rect x="4" y="6" width="4" height="8" rx="1"/><rect x="12" y="6" width="4" height="6" rx="1"/></svg>
+          <svg viewBox="0 0 20 20" class="ico-line"><path d="M2 15l5-6 4 3 7-8"/></svg>
+        </button>
+        <div class="cind">
+          <button class="cbtn" id="cInd" type="button" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 20 20"><path d="M4 16c2 0 2-2 3-6s1-6 3-6M5 9h5M12 10l5 6M17 10l-5 6"/></svg><span>Indicators</span></button>
+          <div class="cmenu" id="indMenu" hidden>
+            <label><input type="checkbox" data-ind="ma7"><i style="background:#F7A600"></i>MA 7</label>
+            <label><input type="checkbox" data-ind="ma25"><i style="background:#C9A6FF"></i>MA 25</label>
+            <label><input type="checkbox" data-ind="ma99"><i style="background:#5B8CFF"></i>MA 99</label>
+            <label><input type="checkbox" data-ind="vol"><i style="background:#089981"></i>Volume</label>
+          </div>
+        </div>
+        <span class="cgrow"></span>
         <span class="chart-live"><b class="live-dot"></b>live</span>
+        <button class="cbtn" id="cShot" type="button" title="Save the chart as an image" aria-label="Save image"><svg viewBox="0 0 20 20"><path d="M3 7h3l1.5-2h5L14 7h3v9H3z"/><circle cx="10" cy="11.5" r="3"/></svg></button>
+        <button class="cbtn" id="cFull" type="button" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 20 20"><path d="M3 8V3h5M12 3h5v5M17 12v5h-5M8 17H3v-5"/></svg></button>
       </div>
-      <div class="legend" id="legend"></div>
-      <div id="chart"></div>
-      <div class="chart-empty" id="chartEmpty">no candles for this pool</div>
+      <div class="cbody">
+        <div class="ctools" id="ctools" role="toolbar" aria-label="Drawing tools">
+          <button data-tool="cross" class="on" title="Crosshair" aria-label="Crosshair"><svg viewBox="0 0 20 20"><path d="M10 2v6M10 12v6M2 10h6M12 10h6"/></svg></button>
+          <button data-tool="trend" title="Trend line: click two points" aria-label="Trend line"><svg viewBox="0 0 20 20"><path d="M4 16L16 4"/><circle cx="4" cy="16" r="1.8"/><circle cx="16" cy="4" r="1.8"/></svg></button>
+          <button data-tool="hline" title="Horizontal line: click a price" aria-label="Horizontal line"><svg viewBox="0 0 20 20"><path d="M2 10h16"/><circle cx="10" cy="10" r="1.8"/></svg></button>
+          <button data-tool="erase" title="Remove drawings" aria-label="Remove drawings"><svg viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg></button>
+        </div>
+        <div class="cmain">
+          <div class="legend" id="legend"></div>
+          <div id="chart"></div>
+          <div class="chart-empty" id="chartEmpty">no candles for this pool</div>
+        </div>
+      </div>
+      <div class="cfoot">
+        <div class="ranges" id="ranges">
+          <button data-range="1">1d</button>
+          <button data-range="7">7d</button>
+          <button data-range="30">30d</button>
+          <button data-range="180">180d</button>
+        </div>
+        <span class="cgrow"></span>
+        <span class="cclock" id="cClock"></span>
+        <div class="cscale" id="cScale">
+          <button data-scale="pct" title="Percent scale">%</button>
+          <button data-scale="log" title="Log scale">log</button>
+          <button data-scale="auto" class="on" title="Auto scale">auto</button>
+        </div>
+      </div>
     </div>
 
     <div class="metrics" id="metrics"></div>

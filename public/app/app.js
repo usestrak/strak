@@ -366,14 +366,25 @@ async function loadHistory(e) {
   drawHistory(j);
 }
 
-/* ── chart: TradingView Lightweight Charts, updated live ─────────────
+/* ── chart: laid out like GMGN / TradingView, drawn by Lightweight Charts, updated live ─────
    Candles come newest first from GeckoTerminal. Times are shifted to the viewer's clock, the
    price scale ignores lone spike prints (a wick far outside the bodies is drawn, but off scale),
-   and the last bars are re-pulled every 15 to 60 seconds so the chart moves while you watch. */
+   and the last bars are re-pulled every 20 to 60 seconds so the chart moves while you watch.
+   Around the pane: timeframes, chart type, indicators, image and full screen on top; crosshair,
+   trend line, horizontal line and eraser on the left; ranges, clock and scale modes below. */
 const TZ = -new Date().getTimezoneOffset() * 60;
-const CH = { chart: null, candle: null, vol: null, ma7: null, ma25: null, data: [], timer: null, key: '' };
+const UP = '#089981', DOWN = '#F23645';
+const MAS = [['ma7', 7, '#F7A600'], ['ma25', 25, '#C9A6FF'], ['ma99', 99, '#5B8CFF']];
+const CH = {
+  chart: null, LC: null, candle: null, line: null, vol: null, mas: {}, data: [], timer: null, key: '',
+  asLine: false, tool: 'cross', pending: null, trends: [], hlines: [], draw: null, range: 0,
+};
+const IND = { ma7: true, ma25: true, ma99: false, vol: true };
+try { Object.assign(IND, JSON.parse(localStorage.getItem('strak.ind') || '{}')); } catch { /* private window */ }
 
 function robustScale(original) {
+  // only in the plain price mode; log and percent scales are left to the library
+  if (CH.chart?.priceScale('right').options().mode !== 0) return original();
   const r = CH.chart?.timeScale().getVisibleLogicalRange();
   const D = CH.data;
   if (!r || !D.length) return original();
@@ -395,42 +406,101 @@ function robustScale(original) {
 
 function precisionFor(p) { return p >= 1000 ? 2 : p >= 1 ? 2 : p >= 0.01 ? 4 : 6; }
 
+/* trend lines live in a series primitive, so they pan and zoom with the candles */
+class Drawings {
+  attached({ chart, series, requestUpdate }) { this.chart = chart; this.series = series; this.update = requestUpdate; }
+  detached() {}
+  updateAllViews() {}
+  paneViews() {
+    const self = this;
+    return [{
+      zOrder: () => 'top',
+      renderer: () => ({
+        draw(target) {
+          const all = CH.pending?.to ? [...CH.trends, CH.pending] : CH.trends;
+          if (!all.length || !self.series) return;
+          target.useBitmapCoordinateSpace(({ context: c, horizontalPixelRatio: hr, verticalPixelRatio: vr }) => {
+            const ts = self.chart.timeScale();
+            c.lineWidth = Math.max(1, 2 * hr);
+            for (const t of all) {
+              const x1 = ts.logicalToCoordinate(t.from.l), x2 = ts.logicalToCoordinate(t.to.l);
+              const y1 = self.series.priceToCoordinate(t.from.p), y2 = self.series.priceToCoordinate(t.to.p);
+              if ([x1, x2, y1, y2].some((v) => v === null || !Number.isFinite(v))) continue;
+              c.strokeStyle = t === CH.pending ? 'rgba(201,166,255,.8)' : '#9945FF';
+              c.beginPath(); c.moveTo(x1 * hr, y1 * vr); c.lineTo(x2 * hr, y2 * vr); c.stroke();
+              c.fillStyle = '#C9A6FF';
+              for (const [x, y] of [[x1, y1], [x2, y2]]) { c.beginPath(); c.arc(x * hr, y * vr, 3.5 * hr, 0, Math.PI * 2); c.fill(); }
+            }
+          });
+        },
+      }),
+    }];
+  }
+}
+
 function initChart() {
   if (CH.chart || !window.LightweightCharts) return;
-  const LC = window.LightweightCharts;
+  const LC = CH.LC = window.LightweightCharts;
   CH.chart = LC.createChart($('chart'), {
     autoSize: true,
-    layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(225,215,255,.55)', fontFamily: '"Ubuntu Sans Mono", ui-monospace, monospace', fontSize: 11 },
+    layout: { background: { type: 'solid', color: '#0F0F10' }, textColor: 'rgba(255,255,255,.6)', fontFamily: '"Ubuntu Sans Mono", ui-monospace, monospace', fontSize: 11 },
     grid: { vertLines: { color: 'rgba(255,255,255,.035)' }, horzLines: { color: 'rgba(255,255,255,.035)' } },
+    watermark: { visible: true, text: 'Strak', fontSize: 120, fontFamily: 'Inter, system-ui, sans-serif', fontStyle: 'bold', color: 'rgba(255,255,255,.035)', horzAlign: 'center', vertAlign: 'center' },
     crosshair: {
       mode: LC.CrosshairMode.Normal,
-      vertLine: { color: 'rgba(201,166,255,.35)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2A1D52' },
-      horzLine: { color: 'rgba(201,166,255,.35)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2A1D52' },
+      vertLine: { color: 'rgba(255,255,255,.3)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2B2B30' },
+      horzLine: { color: 'rgba(255,255,255,.3)', width: 1, style: LC.LineStyle.Dashed, labelBackgroundColor: '#2B2B30' },
     },
-    rightPriceScale: { borderColor: 'rgba(255,255,255,.07)', scaleMargins: { top: 0.12, bottom: 0.26 }, entireTextOnly: true },
-    timeScale: { borderColor: 'rgba(255,255,255,.07)', timeVisible: true, secondsVisible: false, rightOffset: 8, barSpacing: 10, minBarSpacing: 3 },
+    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.14, bottom: 0.22 }, entireTextOnly: true },
+    timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 10, barSpacing: 8, minBarSpacing: 2 },
     handleScroll: { vertTouchDrag: false },
+    localization: { locale: 'en-US' },
   });
-  // Volume first, so the candles draw over it rather than under.
+  // Volume first, so the candles draw over it rather than under; it sits in the bottom fifth.
   CH.vol = CH.chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
-  CH.vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
-  // Moving averages: the two lines every trading screen carries, so the trend reads at a glance.
-  CH.ma7 = CH.chart.addLineSeries({ color: '#C9A6FF', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-  CH.ma25 = CH.chart.addLineSeries({ color: '#5B8CFF', lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  CH.vol.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+  for (const [id, , color] of MAS) {
+    CH.mas[id] = CH.chart.addLineSeries({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  }
+  CH.line = CH.chart.addLineSeries({ color: '#C9A6FF', lineWidth: 2, visible: false, priceLineStyle: LC.LineStyle.Dotted, autoscaleInfoProvider: robustScale });
   CH.candle = CH.chart.addCandlestickSeries({
-    upColor: '#2EBD85', downColor: '#F6465D', borderVisible: false, wickUpColor: '#2EBD85', wickDownColor: '#F6465D',
-    priceLineColor: 'rgba(201,166,255,.8)', priceLineStyle: LC.LineStyle.Dashed, priceLineWidth: 1,
-    autoscaleInfoProvider: robustScale,
+    upColor: UP, downColor: DOWN, borderVisible: false, wickUpColor: UP, wickDownColor: DOWN,
+    priceLineStyle: LC.LineStyle.Dotted, priceLineWidth: 1, autoscaleInfoProvider: robustScale,
   });
-  CH.chart.subscribeCrosshairMove((p) => legend(p?.time ? CH.data.find((c) => c.time === p.time) : null));
+  CH.draw = new Drawings();
+  CH.candle.attachPrimitive(CH.draw);
+  CH.chart.subscribeCrosshairMove(onCrosshair);
+  // Drawing clicks are read from the DOM, not from the library: it holds a second click back while
+  // it waits to see whether it becomes a double click, and a quick second point would be lost.
+  // A press that moved more than a few pixels was a pan, not a click.
+  const el = $('chart');
+  let down = null;
+  el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+  el.addEventListener('pointerup', (e) => {
+    if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4) { down = null; return; }
+    down = null;
+    const r = el.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const ts = CH.chart.timeScale();
+    if (x < 0 || y < 0 || x > ts.width() || y > r.height - ts.height()) return;   // on an axis
+    onChartClick({ point: { x, y }, logical: ts.coordinateToLogical(x) });
+  });
+  applyIndicators();
+  chartControls();
 }
 
 // GeckoTerminal occasionally returns a row with a missing field; a NaN there throws inside the
 // charting library and takes the whole chart down, so bad rows are dropped on the way in.
 const toBar = (c) => ({ time: c[0] + TZ, open: +c[1], high: +c[2], low: +c[3], close: +c[4], value: +c[5] || 0 });
 const drawable = (b) => Number.isFinite(b.time) && [b.open, b.high, b.low, b.close, b.value].every(Number.isFinite);
-const toBars = (list) => list.map(toBar).filter(drawable).reverse();
-const volBar = (b) => ({ time: b.time, value: b.value, color: b.close >= b.open ? 'rgba(46,189,133,.45)' : 'rgba(246,70,93,.45)' });
+// GeckoTerminal also repeats a bar now and then (two rows with one timestamp, seen on 1m), and the
+// library throws on anything but strictly rising times: keep the freshest row per time, then sort.
+const toBars = (list) => {
+  const seen = new Map();
+  for (const b of list.map(toBar).filter(drawable)) if (!seen.has(b.time)) seen.set(b.time, b);
+  return [...seen.values()].sort((x, y) => x.time - y.time);
+};
+const volBar = (b) => ({ time: b.time, value: b.value, color: b.close >= b.open ? 'rgba(8,153,129,.5)' : 'rgba(242,54,69,.5)' });
 
 /** Simple moving average of closes, skipping the first n-1 bars that have nothing to average. */
 function ma(bars, n) {
@@ -450,22 +520,166 @@ const maAt = (bars, n, i) => {
   return sum / n;
 };
 
+// the last price line takes the colour of the last candle, as on every trading screen
+function paintLast() {
+  const b = CH.data[CH.data.length - 1];
+  if (!b) return;
+  const col = b.close >= b.open ? UP : DOWN;
+  CH.candle.applyOptions({ priceLineColor: col });
+  CH.line.applyOptions({ priceLineColor: col });
+}
+
+function setSeries() {
+  CH.candle.setData(CH.data);
+  CH.line.setData(CH.data.map((b) => ({ time: b.time, value: b.close })));
+  CH.vol.setData(CH.data.map(volBar));
+  for (const [id, n] of MAS) CH.mas[id].setData(ma(CH.data, n));
+  paintLast();
+}
+
 function legend(bar) {
   const b = bar || CH.data[CH.data.length - 1];
   const e = state.selected;
   if (!b || !e) { $('legend').innerHTML = ''; return; }
   const i = CH.data.indexOf(b);
   if (i < 0) return;
-  const ch = b.open ? (b.close / b.open - 1) * 100 : 0;
-  const c = ch >= 0 ? 'up' : 'down';
-  const m7 = maAt(CH.data, 7, i), m25 = maAt(CH.data, 25, i);
+  const d = b.close - b.open;
+  const ch = b.open ? (d / b.open) * 100 : 0;
+  const c = d >= 0 ? 'up' : 'down';
+  const tf = $('tfs').querySelector('.on')?.textContent || '';
+  const mas = MAS.filter(([id]) => IND[id]).map(([id, n, color]) => {
+    const v = maAt(CH.data, n, i);
+    return v ? `<span class="lg-ma" style="color:${color}">MA ${n} <em>${price(v)}</em></span>` : '';
+  }).join('');
   $('legend').innerHTML =
-    `<span class="lg-id"><b>${esc(e.symbol)}</b><span class="tfl">${$('tfs').querySelector('.on')?.textContent || ''}</span></span>` +
-    `<span class="lg-ohlc">O <em class="${c}">${price(b.open)}</em> H <em class="${c}">${price(b.high)}</em> ` +
-    `L <em class="${c}">${price(b.low)}</em> C <em class="${c}">${price(b.close)}</em> <em class="${c}">${pct(ch)}</em></span>` +
-    (m7 ? `<span class="lg-ma ma7">MA7 ${price(m7)}</span>` : '') +
-    (m25 ? `<span class="lg-ma ma25">MA25 ${price(m25)}</span>` : '') +
-    `<span class="lg-vol">Vol ${usd(b.value)}</span>`;
+    `<div class="lg-row"><span class="lg-id"><b>${esc(e.symbol)}</b> · ${esc(tf)} · Strak</span>` +
+    `<span>O <em class="${c}">${price(b.open)}</em> H <em class="${c}">${price(b.high)}</em> ` +
+    `L <em class="${c}">${price(b.low)}</em> C <em class="${c}">${price(b.close)}</em> ` +
+    `<em class="${c}">${d >= 0 ? '+' : '-'}${price(Math.abs(d)) === '·' ? '0' : price(Math.abs(d))} (${pct(ch)})</em></span></div>` +
+    `<div class="lg-row">${IND.vol ? `<span>Volume <em class="${c}">${usd(b.value)}</em></span>` : ''}${mas}</div>`;
+}
+
+function barAt(time) { return CH.data.find((c) => c.time === time) || null; }
+
+function onCrosshair(p) {
+  legend(p?.time ? barAt(p.time) : null);
+  // while a trend line waits for its second point, it follows the cursor
+  if (CH.pending && p?.point && p.logical !== undefined) {
+    const price = CH.candle.coordinateToPrice(p.point.y);
+    if (price !== null) { CH.pending.to = { l: p.logical, p: price }; CH.draw.update?.(); }
+  }
+}
+
+function onChartClick(p) {
+  if (!p?.point || CH.tool === 'cross') return;
+  const at = CH.candle.coordinateToPrice(p.point.y);
+  if (at === null || !Number.isFinite(at)) return;
+  if (CH.tool === 'hline') {
+    CH.hlines.push(CH.candle.createPriceLine({ price: at, color: '#9945FF', lineWidth: 1, lineStyle: CH.LC.LineStyle.Solid, axisLabelVisible: true, title: '' }));
+    setTool('cross');
+  } else if (CH.tool === 'trend') {
+    const pt = { l: p.logical, p: at };
+    if (!CH.pending) CH.pending = { from: pt, to: null };
+    else { CH.trends.push({ from: CH.pending.from, to: pt }); CH.pending = null; setTool('cross'); }
+    CH.draw.update?.();
+  }
+}
+
+function clearDrawings() {
+  for (const l of CH.hlines) CH.candle?.removePriceLine(l);
+  CH.hlines = []; CH.trends = []; CH.pending = null;
+  CH.draw?.update?.();
+}
+
+function setTool(t) {
+  CH.tool = t;
+  CH.pending = null;
+  [...$('ctools').children].forEach((b) => b.classList.toggle('on', b.dataset.tool === t));
+  $('chartWrap').classList.toggle('drawing', t === 'trend' || t === 'hline');
+  CH.draw?.update?.();
+}
+
+function applyIndicators() {
+  for (const [id] of MAS) CH.mas[id]?.applyOptions({ visible: IND[id] && !CH.asLine });
+  CH.vol?.applyOptions({ visible: IND.vol });
+  document.querySelectorAll('#indMenu input').forEach((i) => { i.checked = !!IND[i.dataset.ind]; });
+  try { localStorage.setItem('strak.ind', JSON.stringify(IND)); } catch { /* private window */ }
+  legend(null);
+}
+
+function setType(asLine) {
+  CH.asLine = asLine;
+  $('chartWrap').classList.toggle('as-line', asLine);
+  const clear = 'rgba(0,0,0,0)';
+  // the candle series stays (drawings hang on it); in line mode it is only made invisible
+  CH.candle.applyOptions(asLine
+    ? { upColor: clear, downColor: clear, wickUpColor: clear, wickDownColor: clear, priceLineVisible: false, lastValueVisible: false }
+    : { upColor: UP, downColor: DOWN, wickUpColor: UP, wickDownColor: DOWN, priceLineVisible: true, lastValueVisible: true });
+  CH.line.applyOptions({ visible: asLine });
+  applyIndicators();
+}
+
+function setScale(which) {
+  const ps = CH.chart.priceScale('right');
+  const o = ps.options();
+  const M = CH.LC.PriceScaleMode;
+  if (which === 'auto') ps.applyOptions({ autoScale: !o.autoScale });
+  if (which === 'log') ps.applyOptions({ mode: o.mode === M.Logarithmic ? M.Normal : M.Logarithmic });
+  if (which === 'pct') ps.applyOptions({ mode: o.mode === M.Percentage ? M.Normal : M.Percentage });
+  const n = ps.options();
+  const on = { auto: n.autoScale, log: n.mode === M.Logarithmic, pct: n.mode === M.Percentage };
+  [...$('cScale').children].forEach((b) => b.classList.toggle('on', !!on[b.dataset.scale]));
+}
+
+// ranges pick a timeframe that fits the span, the way the range bar on GMGN does
+const RANGE_TF = { 1: ['minute', 5], 7: ['hour', 1], 30: ['hour', 4], 180: ['day', 1] };
+
+function chartControls() {
+  $('ctools').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.tool === 'erase') { clearDrawings(); setTool('cross'); return; }
+    setTool(CH.tool === b.dataset.tool ? 'cross' : b.dataset.tool);
+  });
+  $('cType').addEventListener('click', () => setType(!CH.asLine));
+  $('cInd').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const m = $('indMenu'); m.hidden = !m.hidden;
+    $('cInd').setAttribute('aria-expanded', String(!m.hidden));
+  });
+  $('indMenu').addEventListener('click', (e) => e.stopPropagation());
+  $('indMenu').addEventListener('change', (e) => { const i = e.target; if (i.dataset.ind) { IND[i.dataset.ind] = i.checked; applyIndicators(); } });
+  document.addEventListener('click', () => { $('indMenu').hidden = true; $('cInd').setAttribute('aria-expanded', 'false'); });
+  $('cShot').addEventListener('click', () => {
+    const cv = CH.chart.takeScreenshot();
+    cv.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `strak-${(state.selected?.symbol || 'chart').toLowerCase()}-${($('tfs').querySelector('.on')?.textContent || '').toLowerCase()}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    });
+  });
+  $('cFull').addEventListener('click', () => {
+    const w = $('chartWrap');
+    if (document.fullscreenElement) document.exitFullscreen?.(); else w.requestFullscreen?.();
+  });
+  $('cScale').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setScale(b.dataset.scale); });
+  $('ranges').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const days = +b.dataset.range;
+    const [tf, agg] = RANGE_TF[days];
+    CH.range = days;
+    state.tf = { tf, agg };
+    [...$('tfs').children].forEach((c) => c.classList.toggle('on', c.dataset.tf === tf && +c.dataset.agg === agg));
+    [...$('ranges').children].forEach((c) => c.classList.toggle('on', c === b));
+    if (state.selected) loadCandles(state.selected);
+  });
+  // the clock at the bottom right, in the viewer's time zone like the axis
+  const off = -new Date().getTimezoneOffset() / 60;
+  const zone = 'UTC' + (off ? (off > 0 ? '+' : '') + off : '');
+  const clock = () => { const d = new Date(); $('cClock').textContent = `${d.toTimeString().slice(0, 8)} ${zone}`; };
+  clock(); setInterval(clock, 1000);
 }
 
 async function candles(pool, token, tf, agg) {
@@ -482,7 +696,9 @@ async function loadCandles(e) {
   const wrap = $('chartWrap');
   clearInterval(CH.timer);
   CH.data = [];
-  CH.candle?.setData([]); CH.vol?.setData([]); CH.ma7?.setData([]); CH.ma25?.setData([]);
+  clearDrawings();
+  CH.candle?.setData([]); CH.line?.setData([]); CH.vol?.setData([]);
+  for (const s of Object.values(CH.mas)) s.setData([]);
   legend(null);
   wrap.classList.remove('empty');
   if (!e.pool) { $('chartEmpty').textContent = 'no pool for this token'; wrap.classList.add('empty'); return; }
@@ -504,14 +720,21 @@ async function loadCandles(e) {
   else {
     CH.data = bars;
     const p = precisionFor(CH.data[CH.data.length - 1].close);
-    CH.candle.applyOptions({ priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } });
-    CH.candle.setData(CH.data);
-    CH.vol.setData(CH.data.map(volBar));
-    CH.ma7.setData(ma(CH.data, 7));
-    CH.ma25.setData(ma(CH.data, 25));
-    // Show the recent stretch at a readable width rather than squeezing 300 bars in.
-    const span = Math.min(CH.data.length, 90);
-    CH.chart.timeScale().setVisibleLogicalRange({ from: CH.data.length - span, to: CH.data.length + 6 });
+    const fmt = { priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } };
+    CH.candle.applyOptions(fmt); CH.line.applyOptions(fmt);
+    setSeries();
+    const ts = CH.chart.timeScale();
+    if (CH.range) {
+      // a range button asked for a span of days: show exactly that much, or all there is
+      const last = CH.data[CH.data.length - 1].time;
+      const from = Math.max(CH.data[0].time, last - CH.range * 86400);
+      ts.setVisibleRange({ from, to: last });
+      CH.range = 0;
+    } else {
+      // Show the recent stretch at a readable width rather than squeezing 300 bars in.
+      const span = Math.min(CH.data.length, $('chart').clientWidth < 600 ? 50 : 110);
+      ts.setVisibleLogicalRange({ from: CH.data.length - span, to: CH.data.length + 8 });
+    }
     legend(null);
   }
   // live: pull the latest bars again; the proxy caches 45 s, so faster polling buys nothing
@@ -532,15 +755,18 @@ async function tick(e, key) {
   for (const b of bars) {
     if (b.time < last) continue;
     CH.candle.update(b);
+    CH.line.update({ time: b.time, value: b.close });
     CH.vol.update(volBar(b));
     if (b.time === CH.data[CH.data.length - 1].time) CH.data[CH.data.length - 1] = b; else CH.data.push(b);
     touched = true;
   }
   if (touched) {
     const i = CH.data.length - 1;
-    const m7 = maAt(CH.data, 7, i), m25 = maAt(CH.data, 25, i);
-    if (Number.isFinite(m7)) CH.ma7.update({ time: CH.data[i].time, value: m7 });
-    if (Number.isFinite(m25)) CH.ma25.update({ time: CH.data[i].time, value: m25 });
+    for (const [id, n] of MAS) {
+      const v = maAt(CH.data, n, i);
+      if (Number.isFinite(v)) CH.mas[id].update({ time: CH.data[i].time, value: v });
+    }
+    paintLast();
   }
   legend(null);
   // the last trade is the freshest price there is
@@ -621,6 +847,8 @@ function wire() {
     const b = e.target.closest('button'); if (!b) return;
     state.tf = { tf: b.dataset.tf, agg: +b.dataset.agg };
     [...$('tfs').children].forEach((c) => c.classList.toggle('on', c === b));
+    CH.range = 0;
+    [...$('ranges').children].forEach((c) => c.classList.remove('on'));
     if (state.selected) loadCandles(state.selected);
   });
 

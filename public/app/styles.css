@@ -73,7 +73,14 @@ body {
 .stat.hot b { color: var(--hot); }
 .docs-link { font-family: var(--mono); font-size: 12px; color: var(--dim); text-decoration: none; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line2); }
 .docs-link:hover { color: #fff; border-color: rgba(153,69,255,.6); }
-@media (max-width: 760px) { .status .stat { display: none; } .status .stat.hot { display: flex; } }
+@media (max-width: 760px) {
+  .top { flex-wrap: nowrap; padding: 0 14px; gap: 10px; }
+  .status { flex-wrap: nowrap; gap: 10px; }
+  .status .stat { display: none; }
+  .status .stat.hot { display: flex; }
+  .status .pill { display: none; }          /* the market session is a detail; it cost the header a second row */
+  .brand .sub { display: none; }
+}
 
 /* ── tape ─────────────────────────────────────── */
 .tape-strip {
@@ -283,7 +290,14 @@ body {
 .who-top i { position: absolute; left: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, #6E3BE8, #C9A6FF); }
 .who-note { margin: 10px 0 0; font-family: var(--mono); font-size: 11px; color: var(--dim2); }
 .who .muted { font-family: var(--mono); font-size: 12px; margin: 4px 0; }
-@media (max-width: 900px) { .who-stats { grid-template-columns: repeat(2, 1fr); } #chart { height: 320px; } .legend { font-size: 10.5px; gap: 3px 10px; } .legend .lg-ohlc { width: 100%; } }
+@media (max-width: 900px) {
+  .who-stats { grid-template-columns: repeat(2, 1fr); }
+  .who-stats div:last-child:nth-child(odd) { grid-column: 1 / -1; }   /* five stats: the fifth takes the whole row */
+  #chart { height: 300px; }
+  /* on a phone the legend wraps to two lines; above the chart it reads, on top of the candles it hides them */
+  .legend { position: static; margin: 2px 2px 8px; font-size: 10.5px; gap: 3px 10px; }
+  .legend .lg-ohlc { width: 100%; }
+}
 
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .metric { border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; background: var(--bg2); }

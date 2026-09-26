@@ -106,6 +106,79 @@ function parallax() {
   }, { passive: true });
 }
 
+/* ── the page answers the cursor ────────────────────
+   Three reactions, all of them transform or a single card's own paint, so none of it touches
+   scrolling. A light that trails the pointer, a highlight that follows it across whatever card is
+   under it, and buttons that lean towards it. Everything reads the pointer once per frame from one
+   listener, never per element. Touch screens and reduced-motion get none of it. */
+function cursor() {
+  if (!matchMedia('(pointer: fine)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const glow = document.getElementById('glow');
+  const bg = document.getElementById('bg');
+  const CARDS = '.feat, .step, .plan, .b-card, .hot-card, .faq details, .r-vis, .dash-promo, .end';
+
+  let px = innerWidth / 2, py = innerHeight / 2;   // where the pointer is
+  let gx = px, gy = py;                            // where the light has got to
+  let card = null, cRect = null;
+  let raf = 0, moved = false;
+
+  addEventListener('pointermove', (e) => {
+    px = e.clientX; py = e.clientY;
+    moved = true;
+    const hit = e.target.closest?.(CARDS) || null;
+    if (hit !== card) {
+      card?.classList.remove('lit');
+      card = hit;
+      if (card) { card.classList.add('lit'); cRect = card.getBoundingClientRect(); }
+    } else if (card) {
+      cRect = card.getBoundingClientRect();
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }, { passive: true });
+
+  addEventListener('pointerleave', () => { card?.classList.remove('lit'); card = null; }, { passive: true });
+  addEventListener('scroll', () => { if (card) cRect = card.getBoundingClientRect(); }, { passive: true });
+
+  function tick() {
+    raf = 0;
+    // the light lags behind on purpose: a glow pinned to the cursor looks like a mouse pointer
+    gx += (px - gx) * 0.12;
+    gy += (py - gy) * 0.12;
+    if (glow) glow.style.transform = `translate3d(${(gx - 260).toFixed(1)}px, ${(gy - 260).toFixed(1)}px, 0)`;
+
+    // the whole light field leans a little, which makes the page feel like it has depth
+    if (bg) {
+      const dx = (px / innerWidth - .5) * 2, dy = (py / innerHeight - .5) * 2;
+      bg.style.setProperty('--lean-x', (-dx * 14).toFixed(2) + 'px');
+      bg.style.setProperty('--lean-y', (-dy * 10).toFixed(2) + 'px');
+    }
+
+    if (card && cRect) {
+      card.style.setProperty('--mx', (((px - cRect.left) / cRect.width) * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', (((py - cRect.top) / cRect.height) * 100).toFixed(1) + '%');
+    }
+
+    const near = Math.abs(px - gx) + Math.abs(py - gy);
+    if (near > 0.5 || moved) { moved = false; raf = requestAnimationFrame(tick); }
+  }
+
+  // buttons lean towards the pointer, then spring back
+  for (const b of document.querySelectorAll('.btn')) {
+    b.addEventListener('pointermove', (e) => {
+      const r = b.getBoundingClientRect();
+      b.style.setProperty('--pull-x', (((e.clientX - r.left) / r.width - .5) * 7).toFixed(1) + 'px');
+      b.style.setProperty('--pull-y', (((e.clientY - r.top) / r.height - .5) * 4).toFixed(1) + 'px');
+    }, { passive: true });
+    b.addEventListener('pointerleave', () => {
+      b.style.setProperty('--pull-x', '0px');
+      b.style.setProperty('--pull-y', '0px');
+    }, { passive: true });
+  }
+
+  tick();
+}
+
 /* ── hero: the flow of dots ───────────────────────── */
 // Sixteen lanes of dots on a slow wave, violet on the left turning green on the right: the volume.
 function flow() {
@@ -566,6 +639,7 @@ function wireWv() {
 
 async function main() {
   nav();
+  cursor();
   flow();
   parallax();
   splitWords();

@@ -54,40 +54,59 @@ body {
   animation: drift var(--t) ease-in-out var(--d, 0s) infinite alternate;
   contain: strict;
 }
+#bg { --lean-x: 0px; --lean-y: 0px; }
+.lights {
+  position: absolute; inset: -6%;
+  translate: var(--lean-x) var(--lean-y);
+  transition: translate 1.1s cubic-bezier(.16,1,.3,1);
+}
+.specks {
+  translate: calc(var(--lean-x) * -2.2) calc(var(--lean-y) * -2.2);
+  transition: translate 1.1s cubic-bezier(.16,1,.3,1);
+}
+
+/* the light that trails the pointer */
+#glow {
+  position: absolute; left: 0; top: 0; width: 520px; height: 520px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,166,255,.20) 0%, rgba(153,69,255,.09) 38%, rgba(153,69,255,0) 66%);
+  will-change: transform; contain: strict;
+  animation: none;
+}
+@media (hover: none) { #glow { display: none; } }
 .b1 {
-  --t: 34s;
+  --t: 19s;
   left: -18%; top: -24%; width: 76vw; height: 76vh;
-  background: radial-gradient(circle, rgba(153,69,255,.55) 0%, rgba(153,69,255,.16) 42%, rgba(153,69,255,0) 70%);
+  background: radial-gradient(circle, rgba(153,69,255,.68) 0%, rgba(153,69,255,.20) 42%, rgba(153,69,255,0) 70%);
 }
 .b2 {
-  --t: 46s; --d: -9s;
+  --t: 25s; --d: -9s;
   right: -16%; top: -4%; width: 66vw; height: 70vh;
-  background: radial-gradient(circle, rgba(110,59,232,.40) 0%, rgba(110,59,232,.11) 44%, rgba(110,59,232,0) 70%);
+  background: radial-gradient(circle, rgba(110,59,232,.52) 0%, rgba(110,59,232,.15) 44%, rgba(110,59,232,0) 70%);
 }
 .b3 {
-  --t: 40s; --d: -21s;
+  --t: 22s; --d: -21s;
   right: -14%; bottom: -26%; width: 74vw; height: 74vh;
-  background: radial-gradient(circle, rgba(20,241,149,.34) 0%, rgba(20,241,149,.09) 44%, rgba(20,241,149,0) 70%);
+  background: radial-gradient(circle, rgba(20,241,149,.44) 0%, rgba(20,241,149,.12) 44%, rgba(20,241,149,0) 70%);
 }
 .b4 { display: none; }   /* three lights carry the scene; a fourth only costs a layer */
 @keyframes drift {
-  from { transform: translate3d(-4vw, -3vh, 0); }
-  to   { transform: translate3d(6vw, 4vh, 0); }
+  from { transform: translate3d(-7vw, -5vh, 0); }
+  to   { transform: translate3d(9vw, 6vh, 0); }
 }
 .specks { position: absolute; inset: 0; }
 .specks i {
   position: absolute; left: var(--x); top: var(--y);
   width: var(--s); height: var(--s); border-radius: 50%;
   background: var(--c); opacity: .3;
-  box-shadow: 0 0 8px var(--c);
+  box-shadow: 0 0 10px var(--c), 0 0 22px var(--c);
   will-change: transform, opacity;
   animation: speck var(--t) linear var(--d) infinite;
 }
 @keyframes speck {
   0%   { transform: translate3d(0, 0, 0); opacity: 0; }
-  12%  { opacity: .5; }
-  88%  { opacity: .45; }
-  100% { transform: translate3d(3vw, -22vh, 0); opacity: 0; }
+  10%  { opacity: .85; }
+  85%  { opacity: .7; }
+  100% { transform: translate3d(5vw, -38vh, 0); opacity: 0; }
 }
 .nav, main, .foot { position: relative; z-index: 1; }
 /* grain over everything, so the big soft gradients don't band */
@@ -254,6 +273,34 @@ img { display: block; }
 }
 .chip.hot em { color: var(--mint); text-shadow: 0 0 18px rgba(60,255,170,.55); }
 @keyframes bob { from { translate: 0 -5px; } to { translate: 0 6px; } }
+
+/* Whatever the pointer is over lights up from underneath it. Only the hovered card repaints,
+   and the highlight is one gradient, so this costs nothing while scrolling. */
+.feat, .step, .plan, .b-card, .hot-card, .faq details, .r-vis, .dash-promo, .end {
+  --mx: 50%; --my: 50%;
+  position: relative;
+  transition: border-color .25s, transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s;
+}
+.feat::after, .step::after, .plan::after, .b-card::after, .hot-card::after,
+.faq details::after, .r-vis::after, .dash-promo::after, .end::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  border-radius: inherit; opacity: 0; transition: opacity .3s;
+  background: radial-gradient(circle 260px at var(--mx) var(--my), rgba(201,166,255,.16), rgba(201,166,255,0) 65%);
+}
+.lit::after { opacity: 1; }
+.lit { border-color: rgba(201,166,255,.30) !important; }
+.feat.lit, .step.lit, .plan.lit, .b-card.lit, .hot-card.lit, .dash-promo.lit {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px -22px rgba(153,69,255,.55);
+}
+/* the content has to sit above the highlight */
+.feat > *, .step > *, .plan > *, .b-card > *, .hot-card > *, .faq details > *,
+.dash-promo > *, .end > * { position: relative; z-index: 1; }
+
+/* buttons lean towards the pointer */
+.btn { --pull-x: 0px; --pull-y: 0px; }
+.btn:hover { transform: translate3d(var(--pull-x), var(--pull-y), 0); }
+.btn { transition: background .2s, border-color .2s, box-shadow .2s, transform .18s ease-out; }
 
 /* Long sections get a breath of shade so text never sits straight on the moving light. */
 .sec { position: relative; }
@@ -674,6 +721,8 @@ h3 { margin: 0; font: 600 18px/24px var(--sans); letter-spacing: -.015em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .chip, .tiles span, .live-dot, #bg b, .specks i { animation: none; }
+  .lit { transform: none !important; }
+  .specks, #bg b { transition: none; }
   .slot { transition: none; }
   .marq-track { animation-duration: 400s; }
   .js [data-r], .js .split .w { transition: none; opacity: 1; translate: none; }

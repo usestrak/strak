@@ -34,6 +34,62 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
+
+/* The living background.
+   Everything here moves with `transform` alone, on its own compositor layer, so scrolling never
+   asks the main thread to repaint any of it. A canvas doing the same drift measured 20 frames a
+   second against 59 without it; this costs nothing worth measuring. The light needs no blur
+   filter either: a radial gradient is already soft, and blur is the expensive part. */
+#bg {
+  position: fixed; inset: 0; overflow: hidden;
+  z-index: 0; pointer-events: none;
+  background: var(--ink);
+  --dot-a: #C9A6FF;
+  --dot-b: #8AFFCD;
+  --dot-c: #7E6FB5;
+}
+#bg b {
+  position: absolute; display: block; border-radius: 50%;
+  will-change: transform;
+  animation: drift var(--t) ease-in-out var(--d, 0s) infinite alternate;
+  contain: strict;
+}
+.b1 {
+  --t: 34s;
+  left: -18%; top: -24%; width: 76vw; height: 76vh;
+  background: radial-gradient(circle, rgba(153,69,255,.55) 0%, rgba(153,69,255,.16) 42%, rgba(153,69,255,0) 70%);
+}
+.b2 {
+  --t: 46s; --d: -9s;
+  right: -16%; top: -4%; width: 66vw; height: 70vh;
+  background: radial-gradient(circle, rgba(110,59,232,.40) 0%, rgba(110,59,232,.11) 44%, rgba(110,59,232,0) 70%);
+}
+.b3 {
+  --t: 40s; --d: -21s;
+  right: -14%; bottom: -26%; width: 74vw; height: 74vh;
+  background: radial-gradient(circle, rgba(20,241,149,.34) 0%, rgba(20,241,149,.09) 44%, rgba(20,241,149,0) 70%);
+}
+.b4 { display: none; }   /* three lights carry the scene; a fourth only costs a layer */
+@keyframes drift {
+  from { transform: translate3d(-4vw, -3vh, 0); }
+  to   { transform: translate3d(6vw, 4vh, 0); }
+}
+.specks { position: absolute; inset: 0; }
+.specks i {
+  position: absolute; left: var(--x); top: var(--y);
+  width: var(--s); height: var(--s); border-radius: 50%;
+  background: var(--c); opacity: .3;
+  box-shadow: 0 0 8px var(--c);
+  will-change: transform, opacity;
+  animation: speck var(--t) linear var(--d) infinite;
+}
+@keyframes speck {
+  0%   { transform: translate3d(0, 0, 0); opacity: 0; }
+  12%  { opacity: .5; }
+  88%  { opacity: .45; }
+  100% { transform: translate3d(3vw, -22vh, 0); opacity: 0; }
+}
+.nav, main, .foot { position: relative; z-index: 1; }
 /* grain over everything, so the big soft gradients don't band */
 body::after {
   content: '';
@@ -105,15 +161,15 @@ img { display: block; }
   overflow: hidden;
   isolation: isolate;
   background:
-    radial-gradient(60% 70% at 4% 0%, rgba(153,69,255,.78) 0%, rgba(110,59,232,.34) 42%, rgba(18,10,36,0) 72%),
-    radial-gradient(55% 65% at 100% 100%, rgba(20,241,149,.62) 0%, rgba(20,160,120,.22) 45%, rgba(18,10,36,0) 74%),
-    radial-gradient(40% 30% at 50% 100%, rgba(40,60,120,.35), transparent 70%),
-    var(--deep);
+    radial-gradient(60% 70% at 4% 0%, rgba(153,69,255,.62) 0%, rgba(110,59,232,.26) 42%, rgba(18,10,36,0) 72%),
+    radial-gradient(55% 65% at 100% 100%, rgba(20,241,149,.48) 0%, rgba(20,160,120,.16) 45%, rgba(18,10,36,0) 74%),
+    radial-gradient(40% 30% at 50% 100%, rgba(40,60,120,.28), transparent 70%),
+    rgba(18, 10, 36, .72);
 }
 /* hand the hero's colour down into the page instead of cutting it off */
 .hero::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 160px;
-  background: linear-gradient(180deg, rgba(11,11,16,0), var(--ink));
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 200px;
+  background: linear-gradient(180deg, rgba(11,11,16,0), rgba(11,11,16,.55));
   z-index: 1; pointer-events: none;
 }
 .flow { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
@@ -199,14 +255,21 @@ img { display: block; }
 .chip.hot em { color: var(--mint); text-shadow: 0 0 18px rgba(60,255,170,.55); }
 @keyframes bob { from { translate: 0 -5px; } to { translate: 0 6px; } }
 
+/* Long sections get a breath of shade so text never sits straight on the moving light. */
+.sec { position: relative; }
+.sec::before {
+  content: ''; position: absolute; inset: -30px 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(56% 50% at 50% 50%, rgba(8,7,14,.40), rgba(8,7,14,0) 80%);
+}
+
 /* ── sections: Crypton's layout and motion, in Strak's palette ─────────────
    Card surface #05050A with a hairline edge, radii 12/16/24, lavender tag pills,
    gray and violet pill buttons. Motion is Crypton's appear: 32px rise with a fade,
    0.6s on (.44,0,.56,1), the board frame on a long spring. */
 
 :root {
-  --card: #05050A;
-  --card2: #12121C;
+  --card: rgba(7, 6, 13, .82);
+  --card2: rgba(20, 19, 31, .86);
   --edge: rgba(255, 255, 255, .07);
   --edge2: rgba(255, 255, 255, .11);
   --tag: #C9B6FF;
@@ -268,7 +331,7 @@ h3 { margin: 0; font: 600 18px/24px var(--sans); letter-spacing: -.015em; }
 .dash {
   position: relative; height: 660px; overflow: hidden;
   border-radius: 16px; border: 1px solid var(--edge2);
-  background: linear-gradient(180deg, #0F0C1C, #07060D 70%);
+  background: linear-gradient(180deg, rgba(15,12,28,.94), rgba(7,6,13,.92) 70%);
   box-shadow: 0 40px 120px -30px rgba(0,0,0,.9);
   transform-origin: 50% 0;
   transform: rotateX(18deg) scale(.96);
@@ -477,7 +540,7 @@ h3 { margin: 0; font: 600 18px/24px var(--sans); letter-spacing: -.015em; }
 .end {
   position: relative; height: 400px; border-radius: 16px; border: 1px solid var(--edge);
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 24px;
-  background: linear-gradient(180deg, #05050A 0%, #0D0B26 100%);
+  background: linear-gradient(180deg, rgba(5,5,10,.80) 0%, rgba(13,11,38,.86) 100%);
 }
 .end::after { content: ''; position: absolute; left: 10%; right: 10%; bottom: -1px; height: 140px; background: radial-gradient(50% 100% at 50% 100%, rgba(153,69,255,.45), transparent 70%); pointer-events: none; }
 .end h2 { max-width: 640px; }
@@ -610,7 +673,7 @@ h3 { margin: 0; font: 600 18px/24px var(--sans); letter-spacing: -.015em; }
   .tiles { grid-template-columns: repeat(4, 72px); grid-auto-rows: 72px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .chip, .tiles span, .live-dot { animation: none; }
+  .chip, .tiles span, .live-dot, #bg b, .specks i { animation: none; }
   .slot { transition: none; }
   .marq-track { animation-duration: 400s; }
   .js [data-r], .js .split .w { transition: none; opacity: 1; translate: none; }

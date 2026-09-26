@@ -37,7 +37,6 @@
   </label>
   <nav class="top-links">
     <a href="/">Home</a>
-    <a href="https://github.com/usestrak/strak" target="_blank" rel="noopener">GitHub</a>
     <a href="/app" class="btn">Open terminal</a>
   </nav>
   <button class="menu" id="menu" type="button" aria-label="Open navigation">Menu</button>
@@ -68,7 +67,7 @@
     <a href="#api-candles">GET /api/candles</a>
     <a href="#api-trades">GET /api/trades</a>
     <a href="#api-sparks">GET /api/sparks</a>
-    <a href="#static-files">Static files and source</a>
+    <a href="#static-files">Static files</a>
     <a href="#deep-links">Deep links</a>
     <p class="grp">Reference</p>
     <a href="#glossary">Glossary</a>
@@ -488,12 +487,9 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
 
 <section id="static-files">
   <p class="crumb">Developers</p>
-  <h2>Static files and source</h2>
+  <h2>Static files</h2>
   <p><code>/data/equities.json</code> is the board as of the last deploy, in the same shape as the live route without <code>live</code>. Use it as a fallback or when you need a fixed snapshot. <code>/data/cases.json</code> holds the dated case files.</p>
-  <p>The whole project is open source at <a href="https://github.com/usestrak/strak">github.com/usestrak/strak</a>: the site, the API routes and the scripts. Every hour a GitHub Action saves a snapshot of the whole board to <a href="https://github.com/usestrak/strak/tree/main/history"><code>history/</code></a>, one file per day, and records every stock seen above 50x in <code>history/cases.json</code>.</p>
-  <p>To build your own snapshot locally:</p>
-  <div class="code"><div class="code-h"><span>shell</span><button class="copy">Copy</button></div><pre><code>node scripts/build-registry.mjs</code></pre></div>
-  <p>It prints the count per issuer, the total volume and every stock above 12x, and writes <code>public/data/equities.json</code>.</p>
+  <p>Separately, the whole board is snapshotted every hour and kept. That record is what the <b>Turnover over time</b> panel under each chart is drawn from, and every stock seen above 50x in it is kept as a dated case.</p>
 </section>
 
 <section id="deep-links">
@@ -535,7 +531,7 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
   <p class="crumb">Reference</p>
   <h2>Changelog</h2>
   <div class="log">
-    <div><time>26.09.2026</time><p>A <a href="#pre-ipo">Pre-IPO tab</a> for tokens tracking private companies, kept apart from the board. Swaps per pool: who makes the volume, on the landing and under every chart. Candles moved to a proper trading chart with 1m to 1D timeframes and moving averages. <a href="https://github.com/usestrak/strak">Source opened</a>, with an hourly snapshot of the whole board. Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
+    <div><time>26.09.2026</time><p>A <a href="#pre-ipo">Pre-IPO tab</a> for tokens tracking private companies, kept apart from the board. Swaps per pool: who makes the volume, on the landing and under every chart. Candles moved to a proper trading chart with 1m to 1D timeframes and moving averages. An hourly snapshot of the whole board, drawn as turnover over time under every chart. Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
     <div><time>25.09.2026</time><p>Strak goes live: the terminal, the landing and a live registry route that rebuilds the board every five minutes.</p></div>
     <div><time>23.09.2026</time><p>First registry run: 90 stocks from three issuers. IONQ at 152.4x becomes the first case file.</p></div>
   </div>

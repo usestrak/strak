@@ -273,7 +273,7 @@ function paintCompare(e) {
 
 /* ── turnover over time ─────────────────────────
    The verdict strip says what the pool looks like now. This says whether it has looked like that
-   all day. Points come from the hourly snapshot committed to the repository, so the line is as
+   all day. Points come from the hourly snapshot of the whole board, so the line is as
    dense as the scheduler managed, and the panel says plainly how many readings stand behind it. */
 const HIST = { cache: new Map(), key: '' };
 

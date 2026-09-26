@@ -29,7 +29,7 @@ turnover = volume 24h / liquidity
 
 Turnover says the volume doesn't fit the pool. The live swaps say who is making it: how many wallets, how much of the volume the top three carry, and how many wallets both bought and sold inside the window.
 
-On 23.09.2026 IONQ from Backpack Securities printed **152.4x**: $16.5M of volume on $107K of liquidity. Two days later it read 3.7x on the same depth.
+On 23.09.2026 IONQ from Backpack Securities printed **152.4x**: $16.5M of volume on $108K of liquidity. Two days later it read 3.7x on the same depth.
 
 ## What's in here
 

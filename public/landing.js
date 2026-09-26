@@ -682,7 +682,7 @@ function odoRun(root = document) {
 }
 
 /* ── the case, told by scrolling ─────────────────────
-   One pool with $107K in it, and $16.5M of volume going through it in a day. The section pins
+   One pool with $108K in it, and $16.5M of volume going through it in a day. The section pins
    while you scroll past it and the numbers climb with your position: nothing hijacks the wheel,
    the page scrolls natively and the script only reads where the section is. Every figure comes
    from /data/cases.json, which carries the date of the run it was taken from. */

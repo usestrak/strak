@@ -2,7 +2,7 @@ name: hourly snapshot
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -24,8 +24,8 @@ jobs:
       - run: node scripts/snapshot.mjs
       - name: commit
         run: |
-          git config user.name "strak-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Strak"
+          git config user.email "180978138+usestrak@users.noreply.github.com"
           git add history
           git diff --cached --quiet || git commit -m "snapshot $(date -u +'%Y-%m-%d %H:%M') UTC"
           git push

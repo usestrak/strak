@@ -57,6 +57,7 @@
     <a href="#case-files">Case files</a>
     <p class="grp">Data</p>
     <a href="#universe">Universe and issuers</a>
+    <a href="#pre-ipo">Pre-IPO tokens</a>
     <a href="#sources">Sources and refresh</a>
     <a href="#fields">Field reference</a>
     <p class="grp">Developers</p>
@@ -124,7 +125,7 @@
   <h3 id="t-board">The board</h3>
   <p>Each row is one tokenized stock: its symbol, name and issuer dot, price, 24h change, 24h volume and turnover. The row's tint follows the turnover band. Above the table:</p>
   <ul>
-    <li><b>Issuer tabs:</b> All, Backpack, xStocks, Ondo, each with its live count.</li>
+    <li><b>Issuer tabs:</b> All, Backpack, xStocks, Ondo, each with its live count, and <a href="#pre-ipo">Pre-IPO</a> on the right, which swaps the board for a separate universe rather than filtering it.</li>
     <li><b>Search:</b> matches symbol (<code>NVDAx</code>), plain ticker (<code>NVDA</code>) or company name.</li>
     <li><b>Sort:</b> Turnover, Volume, Depth (liquidity), Change, A to Z.</li>
     <li><b>Above 12x only:</b> hides everything in the normal band.</li>
@@ -282,6 +283,37 @@
   <p>Every record carries two names. <code>symbol</code> is the token's own symbol (<code>NVDAx</code>). <code>ticker</code> is the plain company ticker with the issuer suffix removed (<code>NVDA</code>). The terminal groups wrappers of one company by <code>ticker</code>.</p>
 </section>
 
+<section id="pre-ipo">
+  <p class="crumb">Data</p>
+  <h2>Pre-IPO tokens</h2>
+  <p>A second, smaller universe trades on Solana: tokens that track companies with <b>no listed shares at all</b>. OpenAI, Anthropic, SpaceX, Neuralink, Anduril, Polymarket, Kalshi, Figure AI. Two issuers compete on the same names, <b>PreStocks</b> and <b>Tessera</b>, the second prefixing its symbols with a <code>t</code>.</p>
+
+  <p>They sit on their own tab and never mix into the board, because they break the assumption everything else rests on.</p>
+
+  <table>
+    <thead><tr><th></th><th>A tokenized listed stock</th><th>A pre-IPO token</th></tr></thead>
+    <tbody>
+      <tr><td>Behind the token</td><td>A real share, held by a custodian</td><td>A claim on a company whose shares are not traded</td></tr>
+      <tr><td>Reference price</td><td>The exchange price of that share</td><td>None. The pool price is the only price</td></tr>
+      <tr><td>Can the price be checked?</td><td>Yes, against the market</td><td>No, there is nothing to check it against</td></tr>
+      <tr><td>Do two wrappers agree?</td><td>Yes, within a fraction of a percent</td><td>Not comparable: each issuer sets its own share fraction</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note warn"><b>This is why turnover matters more here, not less.</b> For a listed stock, a strange price can be caught by comparing it to the exchange. For a pre-IPO token there is no such check, so how the volume relates to the pool is close to the only thing that can be verified at all.</div>
+
+  <h3 id="pre-rules">How they are picked</h3>
+  <p>Same liquidity floor of $5,000, same duplicate collapsing. The difference is the tag: a token joins this list when Jupiter tags it <code>prestocks</code> or <code>tessera</code> and it does <b>not</b> carry <code>commodities</code>. That last rule keeps out tokenized gold and silver, which are tagged as real-world assets but are not stocks in any sense.</p>
+  <p>Tokens tagged only <code>stocks</code> or <code>rwa</code>, with no issuer behind them, are in neither list.</p>
+
+  <h3 id="pre-api">In the API</h3>
+  <p>They arrive as a separate <code>preipo</code> array next to <code>equities</code>, in exactly the same shape. <code>count</code> covers listed stocks only, so nothing that reads the board picks them up by accident.</p>
+  <div class="code"><div class="code-h"><span>JavaScript</span><button class="copy">Copy</button></div><pre><code>const { equities, preipo } = await (await fetch('https://strak-six.vercel.app/api/registry')).json();
+
+equities.length;   // listed stocks
+preipo.length;     // pre-IPO, a separate universe</code></pre></div>
+</section>
+
 <section id="sources">
   <p class="crumb">Data</p>
   <h2>Sources and refresh</h2>
@@ -316,7 +348,7 @@
       <tr><td><code>symbol</code></td><td>string</td><td>Token symbol as the issuer minted it, e.g. <code>NVDAx</code>.</td></tr>
       <tr><td><code>ticker</code></td><td>string</td><td>Company ticker without the issuer suffix, e.g. <code>NVDA</code>.</td></tr>
       <tr><td><code>name</code></td><td>string</td><td>Token name.</td></tr>
-      <tr><td><code>issuer</code></td><td>string</td><td><code>backpack</code>, <code>xstocks</code> or <code>ondo</code>.</td></tr>
+      <tr><td><code>issuer</code></td><td>string</td><td><code>backpack</code>, <code>xstocks</code> or <code>ondo</code> on the board; <code>prestocks</code> or <code>tessera</code> in <code>preipo</code>.</td></tr>
       <tr><td><code>price</code></td><td>number</td><td>Price in USD.</td></tr>
       <tr><td><code>liq</code></td><td>number</td><td>Liquidity in USD.</td></tr>
       <tr><td><code>vol24</code></td><td>number</td><td>24h buy volume plus sell volume, USD.</td></tr>
@@ -337,8 +369,9 @@
   <pre><code>{
   "updatedAt": 1790370000000,     // when this build ran, Unix ms
   "chain": { "name": "Solana", "id": "solana" },
-  "count": 93,
+  "count": 93,                    // listed stocks only
   "equities": [ … ],
+  "preipo": [ … ],                // same shape, see Pre-IPO tokens
   "live": true                    // only on /api/registry
 }</code></pre>
 </section>
@@ -471,6 +504,8 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
       <tr><td><code>/app#NVDAx</code></td><td>That exact token.</td></tr>
       <tr><td><code>/app#NVDA</code></td><td>The deepest wrapper of that company.</td></tr>
       <tr><td><code>/app#issuer=backpack</code></td><td>The board filtered to one issuer: <code>backpack</code>, <code>xstocks</code> or <code>ondo</code>.</td></tr>
+      <tr><td><code>/app#issuer=preipo</code></td><td>The pre-IPO tab.</td></tr>
+      <tr><td><code>/app#OPENAI</code></td><td>A pre-IPO token opens its own tab automatically.</td></tr>
     </tbody>
   </table>
 </section>
@@ -489,6 +524,7 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
     <dt>Issuer</dt><dd>The company that holds the real shares and mints the token that tracks them: Backpack Securities, Backed (xStocks) or Ondo.</dd>
     <dt>Wrapper</dt><dd>One issuer's token for a company. NVDAx is the xStocks wrapper of NVIDIA.</dd>
     <dt>Price gap</dt><dd>The difference between two wrappers of the same company. Both track the same share, so a wide gap means one pool is not pricing it.</dd>
+    <dt>Pre-IPO token</dt><dd>A token tracking a company whose shares are not publicly traded. There is no exchange price behind it, so nothing to check the pool price against.</dd>
     <dt>Mint</dt><dd>A token's address on Solana.</dd>
   </dl>
 </section>
@@ -497,7 +533,7 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
   <p class="crumb">Reference</p>
   <h2>Changelog</h2>
   <div class="log">
-    <div><time>26.09.2026</time><p>Swaps per pool: who makes the volume, on the landing and under every chart. Candles moved to a proper trading chart with 1m to 1D timeframes and moving averages. <a href="https://github.com/usestrak/strak">Source opened</a>, with an hourly snapshot of the whole board. Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
+    <div><time>26.09.2026</time><p>A <a href="#pre-ipo">Pre-IPO tab</a> for tokens tracking private companies, kept apart from the board. Swaps per pool: who makes the volume, on the landing and under every chart. Candles moved to a proper trading chart with 1m to 1D timeframes and moving averages. <a href="https://github.com/usestrak/strak">Source opened</a>, with an hourly snapshot of the whole board. Landing rebuilt around a live copy of the terminal. Sparklines from GeckoTerminal with a coarse fallback from pool price change. Issuer deep links. This documentation.</p></div>
     <div><time>25.09.2026</time><p>Strak goes live: the terminal, the landing and a live registry route that rebuilds the board every five minutes.</p></div>
     <div><time>23.09.2026</time><p>First registry run: 90 stocks from three issuers. IONQ at 152.4x becomes the first case file.</p></div>
   </div>

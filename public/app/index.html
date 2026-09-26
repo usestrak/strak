@@ -43,6 +43,7 @@
   <button data-issuer="backpack"><i class="idot backpack"></i>Backpack <em id="cBackpack">·</em></button>
   <button data-issuer="xstocks"><i class="idot xstocks"></i>xStocks <em id="cXstocks">·</em></button>
   <button data-issuer="ondo"><i class="idot ondo"></i>Ondo <em id="cOndo">·</em></button>
+  <button data-issuer="preipo" class="tab-pre"><i class="idot prestocks"></i>Pre-IPO <em id="cPre">·</em></button>
 </nav>
 
 <main class="wrap" id="wrap">
@@ -106,6 +107,9 @@
     </div>
 
     <div class="metrics" id="metrics"></div>
+
+    <!-- pre-IPO tokens track companies with no listed shares, so there is nothing to check against -->
+    <p class="no-ref" id="noRef" hidden>No listed share stands behind this token: the company is private. There is no market price to check this one against, and the two issuers denominate their tokens differently, so their prices are not comparable either. The pool price is the only price there is.</p>
 
     <!-- who makes the volume -->
     <div class="who" id="who" hidden>

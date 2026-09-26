@@ -13,10 +13,16 @@ const ISSUER = {
   backpack: 'Backpack Securities',
   xstocks: 'xStocks',
   ondo: 'Ondo Global Markets',
+  prestocks: 'PreStocks',
+  tessera: 'Tessera',
 };
+// Pre-IPO tokens track private companies. They live on their own tab because the board's whole
+// premise, a listed share you can price the token against, does not hold for them.
+const PRE = new Set(['prestocks', 'tessera']);
 
 const state = {
   equities: [],
+  preipo: [],
   updatedAt: 0,
   live: false,
   issuer: 'all',
@@ -91,11 +97,12 @@ function stampUpdated() {
 }
 
 function applyRegistry(j) {
-  const byAddr = new Map(state.equities.map((e) => [e.address, e]));
+  const byAddr = new Map([...state.equities, ...state.preipo].map((e) => [e.address, e]));
   state.equities = j.equities.map((n) => Object.assign(byAddr.get(n.address) || {}, n));
+  state.preipo = (j.preipo || []).map((n) => Object.assign(byAddr.get(n.address) || {}, n));
   state.updatedAt = j.updatedAt;
   state.live = !!j.live;
-  if (state.selected) state.selected = state.equities.find((e) => e.address === state.selected.address) || state.selected;
+  if (state.selected) state.selected = [...state.equities, ...state.preipo].find((e) => e.address === state.selected.address) || state.selected;
   paintCounts();
   stampUpdated();
 }
@@ -107,6 +114,7 @@ function paintCounts() {
   $('cBackpack').textContent = n('backpack');
   $('cXstocks').textContent = n('xstocks');
   $('cOndo').textContent = n('ondo');
+  $('cPre').textContent = state.preipo.length;
   $('sCount').textContent = L.length;
   $('sVol').textContent = usd(L.reduce((a, e) => a + e.vol24, 0));
   $('sHot').textContent = L.filter((e) => (turnover(e) || 0) > 12).length;
@@ -130,9 +138,12 @@ const match = (e) => {
   return !q || e.symbol.toLowerCase().includes(q) || e.ticker.toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q);
 };
 
+// The pre-IPO tab swaps the dataset rather than filtering the board: the two never mix.
+const dataset = () => (state.issuer === 'preipo' ? state.preipo : state.equities);
+
 function rows() {
-  let l = state.equities.filter(match);
-  if (state.issuer !== 'all') l = l.filter((e) => e.issuer === state.issuer);
+  let l = dataset().filter(match);
+  if (state.issuer !== 'all' && state.issuer !== 'preipo') l = l.filter((e) => e.issuer === state.issuer);
   if (state.onlySuspect) l = l.filter((e) => (turnover(e) || 0) > 12);
   const s = state.sort;
   return l.sort((a, b) => (s === 'ticker' ? a.ticker.localeCompare(b.ticker)
@@ -223,6 +234,7 @@ function paintDetail(e) {
   if (e.organic) m.push(['Jupiter organic score', Math.round(e.organic) + ' / 100']);
   $('metrics').innerHTML = m.map(([k, v]) => `<div class="metric"><i>${k}</i><b>${v}</b></div>`).join('');
 
+  $('noRef').hidden = !PRE.has(e.issuer);
   paintCompare(e);
 
   $('lToken').href = `${SOLSCAN}/token/${e.address}`;
@@ -235,19 +247,26 @@ function paintDetail(e) {
 /* One company, several wrappers (IONQ, IONQx, IONQon): the prices should agree. When they don't,
    one of the pools is not pricing the stock. */
 function paintCompare(e) {
-  const sibs = state.equities.filter((x) => x.ticker === e.ticker);
+  const pre = PRE.has(e.issuer);
+  const sibs = (pre ? state.preipo : state.equities).filter((x) => x.ticker === e.ticker);
   const box = $('compare');
   if (sibs.length < 2) { box.hidden = true; return; }
   box.hidden = false;
+  box.querySelector('.compare-title').textContent = pre ? 'Same company, other issuer' : 'Same stock, other issuers';
   $('compareRows').innerHTML = sibs.map((x) => {
-    const diff = e.price && x.price ? (x.price / e.price - 1) * 100 : null;
+    // Two wrappers of a listed share track the same thing, so the difference between them means
+    // something. Two pre-IPO issuers may define a token as a different slice of a notional share,
+    // so the same subtraction would be noise dressed up as a signal. It is left out.
+    const diff = !pre && e.price && x.price ? (x.price / e.price - 1) * 100 : null;
     const t = turnover(x);
+    const mid = x.address === e.address ? '<span class="r muted">this one</span>'
+      : pre ? `<span class="r muted">${ISSUER[x.issuer] || x.issuer}</span>`
+      : `<span class="r ${cls(diff)}">${pct(diff)}</span>`;
     return `<button data-addr="${x.address}" class="${x.address === e.address ? 'self' : ''}">` +
       `<span class="nm"><i class="idot ${x.issuer}"></i>${esc(x.symbol)}</span>` +
-      `<span class="r">$${price(x.price)}</span>` +
-      `<span class="r ${x.address === e.address ? 'muted' : cls(diff)}">${x.address === e.address ? 'this one' : pct(diff)}</span>` +
+      `<span class="r">$${price(x.price)}</span>${mid}` +
       `<span class="r"><b class="turn ${band(t) || ''}">${t == null ? '·' : t.toFixed(1) + 'x'}</b></span></button>`;
-  }).join('');
+  }).join('') + (pre ? '<p class="compare-note">Each issuer sets its own share fraction, so these prices are not directly comparable.</p>' : '');
 }
 
 /* ── chart: TradingView Lightweight Charts, updated live ─────────────
@@ -510,7 +529,7 @@ function wire() {
 
   $('compareRows').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b || b.classList.contains('self')) return;
-    const hit = state.equities.find((x) => x.address === b.dataset.addr);
+    const hit = [...state.equities, ...state.preipo].find((x) => x.address === b.dataset.addr);
     if (hit) select(hit);
   });
 
@@ -536,9 +555,13 @@ function openFromHash() {
     if (b) b.click();
     return false;
   }
-  const hit = state.equities.find((e) => e.symbol.toLowerCase() === t)
-    || state.equities.filter((e) => e.ticker.toLowerCase() === t).sort((a, b) => b.liq - a.liq)[0];
+  const all = [...state.equities, ...state.preipo];
+  const hit = all.find((e) => e.symbol.toLowerCase() === t)
+    || all.filter((e) => e.ticker.toLowerCase() === t).sort((a, b) => b.liq - a.liq)[0];
   if (!hit) return false;
+  if (PRE.has(hit.issuer) && state.issuer !== 'preipo') {
+    document.querySelector('#tabs button[data-issuer="preipo"]')?.click();
+  }
   select(hit, { silent: true });
   return true;
 }

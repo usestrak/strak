@@ -24,5 +24,7 @@ const byIssuer = rows.reduce((m, r) => ((m[r.issuer] = (m[r.issuer] || 0) + 1), 
 const vol = rows.reduce((a, r) => a + r.vol24, 0);
 console.log(`equities: ${rows.length}  by issuer: ${JSON.stringify(byIssuer)}  vol24: $${(vol / 1e6).toFixed(1)}M`);
 console.log(`with pool: ${rows.filter((r) => r.pool).length}`);
+const pre = reg.preipo || [];
+console.log(`pre-IPO: ${pre.length}  vol24: $${(pre.reduce((a, r) => a + r.vol24, 0) / 1e6).toFixed(1)}M  ${pre.slice(0, 4).map((r) => `${r.symbol} ${r.turnover}x`).join(', ')}`);
 console.log('printed (turnover > 50):', rows.filter((r) => r.turnover > 50).map((r) => `${r.symbol} ${r.turnover}x`).join(', ') || 'none');
 console.log('hot (turnover 12-50):', rows.filter((r) => r.turnover > 12 && r.turnover <= 50).map((r) => `${r.symbol} ${r.turnover}x`).join(', ') || 'none');

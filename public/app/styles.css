@@ -19,6 +19,8 @@
   --dot-backpack: #14F195;
   --dot-xstocks: #BE8CFF;
   --dot-ondo: #8FA8FF;
+  --dot-pre: #FFB35C;
+  --dot-tes: #FF7BC4;
   --mono: 'Ubuntu Sans Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -45,6 +47,8 @@ body {
 .idot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--dot-backpack); flex: none; }
 .idot.xstocks { background: var(--dot-xstocks); }
 .idot.ondo { background: var(--dot-ondo); }
+.idot.prestocks { background: var(--dot-pre); }
+.idot.tessera { background: var(--dot-tes); }
 
 /* ── header ───────────────────────────────────── */
 .top {
@@ -101,6 +105,14 @@ body {
 }
 .tabs button:hover { color: var(--text); }
 .tabs button.on { color: var(--text); border-bottom-color: var(--violet); }
+.tabs .tab-pre { margin-left: auto; }
+.tabs .tab-pre.on { border-bottom-color: var(--dot-pre); }
+.no-ref {
+  margin: 0; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(255,179,92,.28); background: rgba(255,179,92,.07);
+  color: var(--dim); font-size: 13px; line-height: 20px;
+}
+.compare-note { margin: 8px 0 0; font-family: var(--mono); font-size: 11px; color: var(--dim2); line-height: 16px; }
 .tabs em { font-style: normal; color: var(--dim2); font-size: 11px; }
 
 /* ── layout ───────────────────────────────────── */

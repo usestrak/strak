@@ -159,6 +159,17 @@ body {
   color: var(--dim2); font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em;
 }
 .r { text-align: right; }
+/* column headers are buttons: click to sort, again to flip */
+.thead button { background: transparent; border: 0; padding: 0; height: 100%; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; text-align: left; white-space: nowrap; }
+.thead button.r { text-align: right; }
+.thead button:hover { color: var(--dim); }
+.thead button.on { color: var(--text); }
+.thead button i { font-style: normal; margin-left: 4px; color: var(--hot); }
+/* watchlist star */
+.row .star { flex: none; width: 18px; margin-right: -4px; padding: 0; border: 0; background: transparent; color: var(--dim2); font-size: 14px; line-height: 1; cursor: pointer; }
+.row .star:hover { color: var(--text); }
+.row .star.on { color: #F7C948; }
+.tabs .fav-ico { color: #F7C948; margin-right: 6px; font-size: 12px; }
 .rows { overflow-y: auto; flex: 1; max-height: calc(100vh - 262px); min-height: 300px; }
 .row {
   position: relative;

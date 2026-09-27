@@ -582,12 +582,12 @@ function wvRow(x, top, isNew) {
 
 async function loadWv(reset) {
   const e = WV.e;
-  if (!e?.pool || WV.busy) return;
+  if (!e?.address || WV.busy) return;
   WV.busy = true;
-  const j = await getJson(`/api/trades?pool=${e.pool}`, 12000);
+  const j = await getJson(`/api/trades?mint=${e.address}${e.pool ? `&pool=${e.pool}` : ''}`, 12000);
   WV.busy = false;
   if (WV.e !== e) return;
-  if (!j?.trades) { $('wvStamp').textContent = 'GeckoTerminal is busy, retrying in 20s'; return; }
+  if (!j?.trades) { $('wvStamp').textContent = 'swaps did not load, retrying in 20s'; return; }
   const st = j.stats;
   const top = new Map(st.top.map((w, i) => [w.wallet, i + 1]));
   const box = $('wvRows');

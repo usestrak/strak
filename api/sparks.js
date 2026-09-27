@@ -1,14 +1,15 @@
 /**
  * /api/sparks: 24 hourly closes for the pools the landing draws sparklines for.
  *
- * GeckoTerminal allows about 30 calls a minute and answers the browser without CORS, so the page
- * never calls it directly. This route picks the pools itself from the (CDN-cached) registry, which
- * keeps the URL constant: the CDN then holds ONE answer for half an hour, and the whole site costs
- * the upstream about 30 calls per half hour no matter how many people visit.
+ * Closes come from Jupiter's token-level hourly candles (every pool at once), with GeckoTerminal's
+ * pool candles as the fallback. This route picks the stocks itself from the (CDN-cached) registry,
+ * which keeps the URL constant: the CDN then holds ONE answer for half an hour, and the whole site
+ * costs the upstreams about 30 calls per half hour no matter how many people visit.
  *
  * Which pools: the 8 highest turnover plus the 22 most traded, the rows the landing shows.
  * Answer: { sparks: { <pool>: [close, ...] } }, oldest first; pools that failed are left out.
  */
+const JUP = 'https://datapi.jup.ag/v2/charts';
 const GT = 'https://api.geckoterminal.com/api/v2/networks/solana/pools';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 
@@ -31,6 +32,8 @@ async function getJson(url, ms = 9000) {
 }
 
 async function one(pool, mint) {
+  const { json: jup } = await getJson(`${JUP}/${mint}?interval=1_HOUR&to=${Date.now()}&candles=24&type=price&quote=usd`);
+  if (jup?.candles?.length > 2) return jup.candles.map((c) => +c.close);
   const url = `${GT}/${pool}/ohlcv/hour?aggregate=1&limit=24&currency=usd&token=${mint}`;
   for (let i = 0; i < 2; i++) {
     const { status, json } = await getJson(url);
@@ -71,8 +74,8 @@ export default async function handler(req, res) {
     const hit = MEM.get(p);
     if (hit && now - hit.t < FRESH) sparks[p] = hit.s; else todo.push([p, m]);
   }
-  for (let i = 0; i < todo.length; i += 3) {
-    const got = await Promise.all(todo.slice(i, i + 3).map(([p, m]) => one(p, m)));
+  for (let i = 0; i < todo.length; i += 10) {
+    const got = await Promise.all(todo.slice(i, i + 10).map(([p, m]) => one(p, m)));
     got.forEach((s, k) => { if (s) { sparks[todo[i + k][0]] = s; MEM.set(todo[i + k][0], { s, t: now }); } });
   }
   // A mostly failed batch should not be pinned for half an hour.

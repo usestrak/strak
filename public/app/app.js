@@ -28,6 +28,7 @@ const state = {
   issuer: 'all',
   selected: null,
   sort: 'turn',
+  dir: -1,          // -1 largest first, 1 smallest first
   onlySuspect: false,
   q: '',
   iv: '1_MINUTE',    // chart interval, as Jupiter names it; 1m by default, as on GMGN
@@ -116,6 +117,7 @@ function paintCounts() {
   $('cXstocks').textContent = n('xstocks');
   $('cOndo').textContent = n('ondo');
   $('cPre').textContent = state.preipo.length;
+  $('cFav').textContent = FAV.size;
   $('sCount').textContent = L.length;
   $('sVol').textContent = usd(L.reduce((a, e) => a + e.vol24, 0));
   $('sHot').textContent = L.filter((e) => (turnover(e) || 0) > 12).length;
@@ -131,7 +133,19 @@ async function refresh() {
 }
 
 /* ── board ──────────────────────────────────────── */
-const COLS = [['Stock', ''], ['Price', 'r'], ['24h', 'r c-chg'], ['Volume', 'r'], ['Turnover', 'r']];
+// column headers sort too: click once for the natural order, again to flip it
+const COLS = [['Stock', '', 'ticker'], ['Price', 'r', 'price'], ['24h', 'r c-chg', 'change24'], ['Volume', 'r', 'vol24'], ['Turnover', 'r', 'turn']];
+const firstDir = (k) => (k === 'ticker' ? 1 : -1);
+
+/* the watchlist: starred stocks, kept in this browser only */
+const FAV = new Set();
+try { for (const a of JSON.parse(localStorage.getItem('strak.fav') || '[]')) FAV.add(a); } catch { /* private window */ }
+function toggleFav(addr) {
+  if (FAV.has(addr)) FAV.delete(addr); else FAV.add(addr);
+  try { localStorage.setItem('strak.fav', JSON.stringify([...FAV])); } catch { /* private window */ }
+  $('cFav').textContent = FAV.size;
+  render();
+}
 const SORTS = [['turn', 'Turnover'], ['vol24', 'Volume'], ['liq', 'Depth'], ['change24', 'Change'], ['ticker', 'A to Z']];
 
 const match = (e) => {
@@ -140,23 +154,30 @@ const match = (e) => {
 };
 
 // The pre-IPO tab swaps the dataset rather than filtering the board: the two never mix.
-const dataset = () => (state.issuer === 'preipo' ? state.preipo : state.equities);
+const dataset = () => (state.issuer === 'preipo' ? state.preipo
+  : state.issuer === 'fav' ? [...state.equities, ...state.preipo].filter((e) => FAV.has(e.address))
+  : state.equities);
 
 function rows() {
   let l = dataset().filter(match);
-  if (state.issuer !== 'all' && state.issuer !== 'preipo') l = l.filter((e) => e.issuer === state.issuer);
+  if (!['all', 'preipo', 'fav'].includes(state.issuer)) l = l.filter((e) => e.issuer === state.issuer);
   if (state.onlySuspect) l = l.filter((e) => (turnover(e) || 0) > 12);
-  const s = state.sort;
-  return l.sort((a, b) => (s === 'ticker' ? a.ticker.localeCompare(b.ticker)
-    : s === 'turn' ? (turnover(b) || 0) - (turnover(a) || 0)
-    : (b[s] || 0) - (a[s] || 0)));
+  const s = state.sort, d = state.dir;
+  const v = (e) => (s === 'turn' ? turnover(e) : e[s]);
+  return l.sort((a, b) => {
+    if (s === 'ticker') return d * a.ticker.localeCompare(b.ticker);
+    const x = v(a), y = v(b);
+    // stocks with no reading sink to the bottom whichever way the column is sorted
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return (Number.isFinite(y) ? 1 : 0) - (Number.isFinite(x) ? 1 : 0);
+    return d * (x - y);
+  });
 }
 
 function cells(e) {
   const t = turnover(e), bd = band(t);
   const ico = e.icon ? `<img class="ico" src="${esc(e.icon)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : '<span class="ico"></span>';
   return [
-    `<span class="tk">${ico}<div><b>${esc(e.symbol)}<i class="idot ${e.issuer}" title="${ISSUER[e.issuer]}"></i></b><i>${esc(e.name || '')}</i></div></span>`,
+    `<span class="tk"><button class="star${FAV.has(e.address) ? ' on' : ''}" data-fav="${esc(e.address)}" aria-label="${FAV.has(e.address) ? 'Remove from' : 'Add to'} watchlist" title="Watchlist">${FAV.has(e.address) ? '★' : '☆'}</button>${ico}<div><b>${esc(e.symbol)}<i class="idot ${e.issuer}" title="${ISSUER[e.issuer]}"></i></b><i>${esc(e.name || '')}</i></div></span>`,
     `<span class="r">${price(e.price)}</span>`,
     `<span class="r c-chg ${cls(e.change24)}">${pct(e.change24)}</span>`,
     `<span class="r">${usd(e.vol24)}</span>`,
@@ -166,7 +187,10 @@ function cells(e) {
 
 function render() {
   const list = rows();
-  $('thead').innerHTML = COLS.map(([c, k]) => `<span class="${k}">${c}</span>`).join('');
+  $('thead').innerHTML = COLS.map(([c, k, key]) => {
+    const on = state.sort === key;
+    return `<button class="${k}${on ? ' on' : ''}" data-col="${key}" aria-sort="${on ? (state.dir < 0 ? 'descending' : 'ascending') : 'none'}">${c}${on ? `<i>${state.dir < 0 ? '↓' : '↑'}</i>` : ''}</button>`;
+  }).join('');
   $('sorts').innerHTML = SORTS.map(([k, label]) =>
     `<button data-sort="${k}"${state.sort === k ? ' class="on"' : ''}>${label}</button>`).join('') +
     `<button data-filter="suspect" class="flt${state.onlySuspect ? ' on' : ''}">Above 12x only</button>`;
@@ -179,11 +203,15 @@ function render() {
     const bd = band(turnover(e));
     div.className = 'row' + (bd && bd !== 'organic' ? ' ' + bd : '') + (state.selected?.address === e.address ? ' on' : '');
     div.innerHTML = cells(e).join('');
-    div.onclick = () => select(e);
+    div.onclick = (ev) => {
+      const star = ev.target.closest('.star');
+      if (star) { ev.stopPropagation(); toggleFav(e.address); return; }
+      select(e);
+    };
     frag.appendChild(div);
   }
   box.appendChild(frag);
-  if (!list.length) box.innerHTML = '<div class="empty-rows">nothing matches</div>';
+  if (!list.length) box.innerHTML = state.issuer === 'fav' && !state.q ? '<div class="empty-rows">tap ☆ next to any stock to keep it here</div>' : '<div class="empty-rows">nothing matches</div>';
   $('rowCount').textContent = list.length + ' listed';
 }
 
@@ -845,15 +873,15 @@ let whoTimer = null;
 async function loadWho(e) {
   clearInterval(whoTimer);
   const box = $('who');
-  if (!e.pool) { box.hidden = true; return; }
+  if (!e.address) { box.hidden = true; return; }
   box.hidden = false;
   const run = async () => {
     if (document.hidden) return;
     try {
-      const r = await fetch(`/api/trades?pool=${e.pool}`);
+      const r = await fetch(`/api/trades?mint=${e.address}${e.pool ? `&pool=${e.pool}` : ''}`);
       if (state.selected?.address !== e.address) return;
-      if (!r.ok) { $('whoOut').innerHTML = '<p class="muted">swaps are rate limited right now, retrying</p>'; return; }
-      const { stats: s } = await r.json();
+      if (!r.ok) { $('whoOut').innerHTML = '<p class="muted">swaps did not load, retrying</p>'; return; }
+      const { stats: s, scope } = await r.json();
       const max = s.top[0]?.usd || 1;
       $('whoOut').innerHTML = `
         <div class="who-stats">
@@ -864,10 +892,10 @@ async function loadWho(e) {
           <div><i>Bought and sold</i><b>${s.roundTripWallets} · ${(s.roundTripShare * 100).toFixed(1)}%</b></div>
         </div>
         <div class="who-top">${s.top.map((w, i) => `<a href="https://solscan.io/account/${w.wallet}" target="_blank" rel="noopener"><span>#${i + 1} ${shortW(w.wallet)}</span><em>${w.buy} buy · ${w.sell} sell</em><b>${cash(w.usd)}</b><i style="width:${(w.usd / max * 100).toFixed(1)}%"></i></a>`).join('')}</div>
-        <p class="who-note">Last ${s.count} swaps, ${s.minutes < 90 ? Math.round(s.minutes) + ' min' : (s.minutes / 60).toFixed(1) + ' h'} of trading. Refreshes every 30 s.</p>`;
+        <p class="who-note">Last ${s.count} swaps ${scope === 'pool' ? 'in the deepest pool' : 'across every pool'}, ${s.minutes < 90 ? Math.round(s.minutes) + ' min' : (s.minutes / 60).toFixed(1) + ' h'} of trading. Refreshes every 30 s.</p>`;
     } catch {}
   };
-  $('whoOut').innerHTML = '<p class="muted">reading the last 300 swaps…</p>';
+  $('whoOut').innerHTML = '<p class="muted">reading the latest swaps…</p>';
   await run();
   whoTimer = setInterval(run, 30000);
 }
@@ -897,7 +925,14 @@ function wire() {
   $('sorts').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.filter === 'suspect') state.onlySuspect = !state.onlySuspect;
-    else state.sort = b.dataset.sort;
+    else { state.sort = b.dataset.sort; state.dir = firstDir(state.sort); }
+    render();
+  });
+
+  $('thead').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-col]'); if (!b) return;
+    const k = b.dataset.col;
+    if (state.sort === k) state.dir = -state.dir; else { state.sort = k; state.dir = firstDir(k); }
     render();
   });
 

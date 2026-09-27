@@ -62,7 +62,7 @@ async function live() {
   if (withPool) {
     $('candlesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/candles?mint=${withPool.address}&interval=1_HOUR&candles=100"`;
     const busiest = top || withPool;
-    if (busiest.pool) $('tradesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/trades?pool=${busiest.pool}" | jq .stats`;
+    if (busiest.pool) $('tradesCurl').textContent = `curl -s "https://strak-six.vercel.app/api/trades?mint=${busiest.address}" | jq .stats`;
   }
 }
 

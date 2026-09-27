@@ -30,8 +30,8 @@ const state = {
   sort: 'turn',
   onlySuspect: false,
   q: '',
-  iv: '15_MINUTE',   // chart interval, as Jupiter names it
-  ctype: 'price',    // price or market cap
+  iv: '1_MINUTE',    // chart interval, as Jupiter names it; 1m by default, as on GMGN
+  ctype: 'mcap',     // market cap by default, as on GMGN; the toolbar switches to price
 };
 
 /* ── format ─────────────────────────────────────── */
@@ -718,7 +718,8 @@ function showBars(bars, fresh) {
   const fmt = state.ctype === 'mcap'
     ? { priceFormat: { type: 'custom', minMove: 0.01, formatter: (v) => usd(v).replace('$', '') } }
     : (() => { const p = precisionFor(bars[bars.length - 1].close); return { priceFormat: { type: 'price', precision: p, minMove: 1 / 10 ** p } }; })();
-  CH.candle.applyOptions(fmt); CH.line.applyOptions(fmt);
+  // every series on the right scale gets the format: the scale labels follow the first one added (an MA)
+  for (const x of [CH.candle, CH.line, ...Object.values(CH.mas)]) x.applyOptions(fmt);
   setSeries();
   const ts = CH.chart.timeScale();
   if (CH.range) {

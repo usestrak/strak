@@ -343,6 +343,10 @@ body {
   .cbar, .cfoot { overflow-x: auto; scrollbar-width: none; }
   .cbar::-webkit-scrollbar, .cfoot::-webkit-scrollbar { display: none; }
   .cbtn span, .cclock { display: none; }
+  /* price or market cap is the first thing to read, so on a phone it leads the toolbar */
+  .cbar .csep { display: none; }
+  .cpm { order: -1; padding-right: 8px; margin-right: 4px; border-right: 1px solid var(--cline); }
+  .tfs button { padding: 6px 7px; }
   .legend { position: static; padding: 8px 10px 4px; font-size: 11px; }
   .legend .lg-id { font-size: 12px; }
 }

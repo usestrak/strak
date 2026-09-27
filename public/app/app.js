@@ -1,7 +1,7 @@
 /* Strak terminal.
    Every tokenized stock on Solana on one board, coloured by turnover: 24h volume over pool depth.
    The board comes from /api/registry (live, CDN-cached) with /data/equities.json as the fallback.
-   Candles go through /api/candles, because GeckoTerminal answers the browser with a 429 and no CORS. */
+   Candles and swaps come from Jupiter; /api/candles and /api/trades are the fallbacks. */
 
 const SOLSCAN = 'https://solscan.io';
 const DEXSCREENER = 'https://dexscreener.com/solana';
@@ -396,7 +396,7 @@ async function loadHistory(e) {
 }
 
 /* ── chart: laid out like GMGN / TradingView, drawn by Lightweight Charts, updated live ─────
-   Candles come newest first from GeckoTerminal. Times are shifted to the viewer's clock, the
+   Candles come from Jupiter (see below). Times are shifted to the viewer's clock, the
    price scale ignores lone spike prints (a wick far outside the bodies is drawn, but off scale),
    and the last bars are re-pulled every 20 to 60 seconds so the chart moves while you watch.
    Around the pane: timeframes, chart type, indicators, image and full screen on top; crosshair,

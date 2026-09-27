@@ -18,6 +18,8 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@usestrak">
+<meta name="twitter:creator" content="@usestrak">
 <meta name="twitter:image" content="https://strak-six.vercel.app/og-2.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +151,7 @@
       <tr><td>Trades 24h</td><td>Number of buys plus sells.</td></tr>
       <tr><td>Holders</td><td>Wallets holding the token.</td></tr>
       <tr><td>Jupiter organic score</td><td>Jupiter's own 0 to 100 estimate of how organic the token's activity is. Shown for reference; Strak does not use it in turnover.</td></tr>
-      <tr><td>Who trades this pool</td><td>The last 300 swaps: trades a minute, median trade, distinct wallets, the share carried by the top three, and how many wallets both bought and sold. Refreshes every 30 seconds.</td></tr>
+      <tr><td>Who trades it</td><td>The last 300 swaps across every pool of the stock: trades a minute, median trade, distinct wallets, the share carried by the top three, and how many wallets both bought and sold. Refreshes every 30 seconds.</td></tr>
       <tr><td>Other issuers</td><td>The same company under other wrappers: price, difference from the selected one, turnover.</td></tr>
       <tr><td>Links</td><td>Token and pool on Solscan, the pair on DexScreener, and which DEX and quote asset the pool uses.</td></tr>
     </tbody>
@@ -210,7 +212,7 @@
 <section id="who">
   <p class="crumb">Method</p>
   <h2>Who makes the volume</h2>
-  <p>Turnover says the volume does not fit the pool. It does not say who is producing it. For that, Strak reads the pool's last 300 swaps and groups them by wallet. Four numbers come out, and together they separate a busy market from a loop.</p>
+  <p>Turnover says the volume does not fit the pool. It does not say who is producing it. For that, Strak reads the stock's last 300 swaps, across every pool, and groups them by wallet. Four numbers come out, and together they separate a busy market from a loop.</p>
 
   <table>
     <thead><tr><th>Number</th><th>What it means</th><th>What a loop looks like</th></tr></thead>
@@ -341,7 +343,7 @@ preipo.length;     // pre-IPO, a separate universe</code></pre></div>
     <li>Compute turnover and sort by volume.</li>
   </ol>
   <p>A full build takes a few seconds. The CDN keeps each answer for five minutes, so one build serves every visitor in that window. If the upstreams fail, the site falls back to the static snapshot in <code>/data/equities.json</code>, and the terminal labels the board as a snapshot instead of live.</p>
-  <div class="note"><b>The chart and turnover share a scope; the swaps do not.</b> Turnover uses Jupiter's token-level volume and liquidity, and the chart is Jupiter's token-level candles, so both count every pool. The pool link and the swaps under the chart come from the single deepest pool from DexScreener, so a swap count there covers that pool only.</div>
+  <div class="note"><b>One scope for everything you read.</b> Turnover uses Jupiter's token-level volume and liquidity, the chart is Jupiter's token-level candles, and the swaps are Jupiter's token-level trade feed, so all three count every pool. Only the pool link points at a single pool: the deepest one DexScreener reports.</div>
 </section>
 
 <section id="fields">
@@ -393,7 +395,7 @@ preipo.length;     // pre-IPO, a separate universe</code></pre></div>
     <thead><tr><th>Endpoint</th><th>Returns</th><th>Cached</th></tr></thead>
     <tbody>
       <tr><td><code>GET /api/registry</code></td><td>The live board</td><td>5 min</td></tr>
-      <tr><td><code>GET /api/candles</code></td><td>OHLCV for one pool</td><td>45 s</td></tr>
+      <tr><td><code>GET /api/candles</code></td><td>OHLCV for one stock</td><td>45 s</td></tr>
       <tr><td><code>GET /api/trades</code></td><td>The last swaps in a pool and who made them</td><td>20 s</td></tr>
       <tr><td><code>GET /api/sparks</code></td><td>24 hourly closes for the landing's pools</td><td>30 min</td></tr>
       <tr><td><code>GET /data/equities.json</code></td><td>Static snapshot of the board</td><td>60 s</td></tr>
@@ -554,7 +556,7 @@ console.log(`${hot.length} stocks above 12x as of ${new Date(updatedAt).toISOStr
 <nav class="pager" id="pager"></nav>
 <footer class="doc-foot">
   <span>Strak · Tokenized stocks on Solana. Is the volume real.</span>
-  <a href="/app">Open terminal →</a>
+  <span><a href="https://x.com/usestrak" target="_blank" rel="noopener">@usestrak</a> · <a href="/app">Open terminal →</a></span>
 </footer>
 </main>
 

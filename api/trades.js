@@ -34,7 +34,9 @@ async function fromJupiter(mint) {
   let offset = '';
   const until = Date.now() + 5000;   // a first visitor should not wait longer; the CDN serves the rest
   while (out.length < WANT && Date.now() < until) {
-    const r = await get(`${JUP}/${mint}${offset ? `?offset=${offset}` : ''}`, 5000);
+    let r = await get(`${JUP}/${mint}${offset ? `?offset=${offset}` : ''}`, 5000);
+    // a limit on the very first page gets one more try; later pages just end the window early
+    if (r.status === 429 && !out.length) { await new Promise((w) => setTimeout(w, 800)); r = await get(`${JUP}/${mint}`, 5000); }
     if (!r.ok) break;
     const j = await r.json();
     const page = (j.txs || []).filter((x) => !offset || x.actionId !== offset);

@@ -880,7 +880,14 @@ async function loadWho(e) {
     try {
       const r = await fetch(`/api/trades?mint=${e.address}${e.pool ? `&pool=${e.pool}` : ''}`);
       if (state.selected?.address !== e.address) return;
-      if (!r.ok) { $('whoOut').innerHTML = '<p class="muted">swaps did not load, retrying</p>'; return; }
+      if (!r.ok) {
+        // keep the last good reading on screen; only an empty panel says it is still trying
+        if (!$('whoOut').querySelector('.who-stats')) {
+          $('whoOut').innerHTML = '<p class="muted">swaps did not load, trying again</p>';
+          setTimeout(() => { if (state.selected?.address === e.address) run(); }, 5000);
+        }
+        return;
+      }
       const { stats: s, scope } = await r.json();
       const max = s.top[0]?.usd || 1;
       $('whoOut').innerHTML = `

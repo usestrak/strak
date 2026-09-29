@@ -1,14 +1,14 @@
 [
  {
   "date": "2026-09-29",
-  "t": 1790709202119,
+  "t": 1790709225505,
   "symbol": "DJT",
   "ticker": "DJT",
   "issuer": "backpack",
   "address": "DJTu7vi8norVzdVAffgvb39VP7wjKeTsgaMBJrzfxvoF",
   "pool": "7gkB2D1SqhUYgKrSpDU5cma4tK9efijHouYituABdJcG",
-  "turnover": 67.46,
-  "vol24": 32210287,
-  "liq": 477483
+  "turnover": 67.63,
+  "vol24": 32211662,
+  "liq": 476316
  }
 ]

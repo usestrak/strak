@@ -22,5 +22,17 @@
   "turnover": 74.43,
   "vol24": 43510507,
   "liq": 584568
+ },
+ {
+  "date": "2026-10-01",
+  "t": 1790844752947,
+  "symbol": "BE",
+  "ticker": "BE",
+  "issuer": "backpack",
+  "address": "BEBVfXZ8uCxRBuunEbW9wcq9r7W9ySNo14oJBJkDgpZx",
+  "pool": "Gyg2VDu4Rtb2RArVPoAs78rBvYBF6T83Sdy8PtsU4Shf",
+  "turnover": 87.42,
+  "vol24": 6375792,
+  "liq": 72930
  }
 ]

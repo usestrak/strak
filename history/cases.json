@@ -37,14 +37,14 @@
  },
  {
   "date": "2026-10-01",
-  "t": 1790894335454,
+  "t": 1790897637656,
   "symbol": "AMC",
   "ticker": "AMC",
   "issuer": "backpack",
   "address": "AMC1qwR9KhiyrQBRPrxnfo4JfMeMZqEBvt5tgTytNNoc",
   "pool": "Crq38vJWRE7tB4iABufAATTh6QUKaidQtMDueiJkGoX4",
-  "turnover": 51.59,
-  "vol24": 8174593,
-  "liq": 158464
+  "turnover": 53.47,
+  "vol24": 8222298,
+  "liq": 153766
  }
 ]

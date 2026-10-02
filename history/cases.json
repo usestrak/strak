@@ -58,5 +58,17 @@
   "turnover": 92.12,
   "vol24": 9535530,
   "liq": 103514
+ },
+ {
+  "date": "2026-10-02",
+  "t": 1790957136576,
+  "symbol": "PUSA",
+  "ticker": "PUSA",
+  "issuer": "backpack",
+  "address": "PUSAG1stksTcAoK9MjinEHUwAYRJsbovywYCk37m6hy",
+  "pool": "3d1PUof9KcRB5Td5UMhiAx8Cbs6dZ2bggFGkjioAY7jb",
+  "turnover": 75.9,
+  "vol24": 3659528,
+  "liq": 48215
  }
 ]

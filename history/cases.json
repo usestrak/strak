@@ -73,14 +73,14 @@
  },
  {
   "date": "2026-10-03",
-  "t": 1791026563093,
+  "t": 1791056300874,
   "symbol": "BLK",
   "ticker": "BLK",
   "issuer": "backpack",
   "address": "BLKKYfF41c6xRPrtX1rdYbxLE1xxEdZUnxQsB5hcZ8Nf",
   "pool": "CXiMpxm5AE1n8orfQxnsH9f8dfcHGaT3rpbyhZqtcdNE",
-  "turnover": 83,
-  "vol24": 22450779,
-  "liq": 270496
+  "turnover": 83.24,
+  "vol24": 23131055,
+  "liq": 277876
  }
 ]
